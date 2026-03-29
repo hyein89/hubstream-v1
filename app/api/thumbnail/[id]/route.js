@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic';
-
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export async function GET(req, { params }) {
-  // Buang ekstensi buat nyari ID-nya
-  const id = params.id.replace(/\.(jpg|png)$/, '');
+  // AWAIT PARAMS DI API ROUTE
+  const resolvedParams = await params;
+  const id = resolvedParams.id.replace(/\.(jpg|png)$/, '');
   
   const { data } = await supabase.from('videos').select('image').eq('id', id).single();
   
@@ -13,6 +13,5 @@ export async function GET(req, { params }) {
     return new NextResponse('Gambar Tidak Ditemukan', { status: 404 });
   }
 
-  // Lempar ke URL asli yang ada di Supabase
   return NextResponse.redirect(data.image);
 }
