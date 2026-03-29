@@ -1,14 +1,16 @@
+export const dynamic = 'force-dynamic';
+
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default async function HalamanTonton({ params }) {
   const { data } = await supabase.from('videos').select('*').eq('id', params.id).single();
   
-  // Lempar ke 404 kalau ID gak ketemu
+  // Lempar ke 404 kalau ID beneran gak ketemu di DB
   if (!data) return notFound();
 
   return (
-    <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px' }}>
+    <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px', fontFamily: 'system-ui, sans-serif' }}>
       <h2 style={{ margin: '0 0 15px 0' }}>{data.title}</h2>
       
       {/* Bungkus player dari halaman embed */}
