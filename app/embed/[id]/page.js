@@ -11,18 +11,13 @@ export default function EmbedPlayer({ params }) {
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState(false);
   
-  // State buat nandain kalo script Fluid Player udah kelar didownload
   const [fluidLoaded, setFluidLoaded] = useState(false);
   const playerRef = useRef(null);
 
-  // 1. Tarik Data Database
   useEffect(() => {
     async function fetchData() {
       const { data: vData, error: vErr } = await supabase.from('videos').select('*').eq('id', videoId).single();
-      if (vErr || !vData) {
-        setError(true);
-        return;
-      }
+      if (vErr || !vData) { setError(true); return; }
       setVideoData(vData);
 
       const { data: sData } = await supabase.from('settings').select('*').eq('id', 1).single();
@@ -33,31 +28,44 @@ export default function EmbedPlayer({ params }) {
     fetchData();
   }, [videoId]);
 
-  // 2. Setup Player Kalo Data & Script Udah Siap
   useEffect(() => {
     if (fluidLoaded && videoData && settings && window.fluidPlayer && !playerRef.current) {
       
-      // Acak VAST
-      let vastTags = [...(settings.vast_urls || [])].sort(() => Math.random() - 0.5);
+      // === LOGIKA VAST ACAK & ANTI-CACHE ===
+      let vastTags = [...(settings.vast_urls || [])];
+      
+      // Tambahin cache-buster biar browser gak nyimpen tag yang sama terus
+      vastTags = vastTags.map(url => {
+        return url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`;
+      });
+      
+      // Acak urutan
+      vastTags = vastTags.sort(() => Math.random() - 0.5);
+
       let primaryVast = vastTags.length > 0 ? vastTags[0] : null;
       let fallbackVasts = vastTags.length > 1 ? vastTags.slice(1) : [];
 
       let adListConfig = [];
       if (primaryVast) {
-        adListConfig.push({ roll: 'preRoll', vastTag: primaryVast, fallbackVastTags: fallbackVasts });
+        adListConfig.push({ 
+          roll: 'preRoll', 
+          vastTag: primaryVast, 
+          fallbackVastTags: fallbackVasts 
+        });
       }
 
-      // Init Player
       const player = window.fluidPlayer(`embed-player-${videoId}`, {
         layoutControls: {
           autoPlay: false, mute: false, allowDownload: false, logo: { imageUrl: null },
           fillToContainer: true
         },
-        vastOptions: { adList: adListConfig }
+        vastOptions: { 
+          adList: adListConfig,
+          vastTimeout: 3000 // MAKSIMAL NUNGGU 3 DETIK! Kalo delay, buang, ganti tag selanjutnya.
+        }
       });
       playerRef.current = player;
 
-      // Event Tombol Play & Popunder
       const btnPlay = document.getElementById('btn-custom-play');
       const containerGede = document.getElementById('area-klik');
 
@@ -72,7 +80,6 @@ export default function EmbedPlayer({ params }) {
 
       player.on('play', () => { if (btnPlay) btnPlay.style.display = 'none'; });
 
-      // Popunder 3 Menit
       const linkPopunder = settings.link_offer;
       const jedaWaktu = 180000; 
 
@@ -101,8 +108,6 @@ export default function EmbedPlayer({ params }) {
   return (
     <>
       <link rel="stylesheet" href="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.css" type="text/css" />
-      
-      {/* Script dipaksa render duluan biar gak nyangkut */}
       <Script 
         src="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.js" 
         strategy="afterInteractive"
@@ -116,13 +121,24 @@ export default function EmbedPlayer({ params }) {
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Jost", sans-serif; }
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; }
         
+        /* === KUNCI UKURAN MENTOK SELAYAR === */
         .embed-container {
-          position: relative; width: 100vw; height: 100vh;
-          display: flex; justify-content: center; align-items: center; background: #000; overflow: hidden;
+          position: absolute; top: 0; left: 0; 
+          width: 100vw; height: 100vh;
+          display: flex; justify-content: center; align-items: center; 
+          background: #000; overflow: hidden;
         }
         
-        .fluid_video_wrapper { width: 100% !important; height: 100% !important; }
-        video { width: 100% !important; height: 100% !important; object-fit: contain; background-color: #000; }
+        .fluid_video_wrapper { 
+          width: 100vw !important; height: 100vh !important; 
+          max-width: 100% !important; max-height: 100% !important; 
+        }
+        
+        video { 
+          width: 100vw !important; height: 100vh !important; 
+          max-width: 100% !important; max-height: 100% !important; 
+          object-fit: contain !important; background-color: #000; 
+        }
         
         .fluid_video_wrapper.fluid_player_layout_default .fluid_initial_play { display: none !important; }
         video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
@@ -137,7 +153,6 @@ export default function EmbedPlayer({ params }) {
         .custom-play-btn:hover { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 0 35px rgba(58, 123, 213, 0.8); }
         .custom-play-btn svg { width: 35px; height: 35px; fill: white; margin-left: 5px; }
 
-        /* Layar hitam loading biar gak kelihatan mentahannya */
         .loading-screen {
           position: absolute; top: 0; left: 0; width: 100%; height: 100%;
           background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000;
@@ -149,21 +164,12 @@ export default function EmbedPlayer({ params }) {
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       `}</style>
 
-      {/* Baru ngerender HTML video kalo data videonya udah kebaca dari DB */}
       {videoData && (
         <div className="embed-container" id="area-klik">
-          
-          {/* Layar penutup selama Fluid Player belum siap */}
-          {!fluidLoaded && (
-            <div className="loading-screen">
-              <div className="spinner"></div>
-            </div>
-          )}
-
+          {!fluidLoaded && <div className="loading-screen"><div className="spinner"></div></div>}
           <div className="custom-play-btn" id="btn-custom-play" style={{ display: fluidLoaded ? 'flex' : 'none' }}>
             <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           </div>
-
           <video id={`embed-player-${videoId}`} playsInline poster={`/${videoId}.jpg`}>
             <source src={videoData.video} type="video/mp4" />
           </video>
