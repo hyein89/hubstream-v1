@@ -16,6 +16,7 @@ export default function Home() {
   const progressTextRef = useRef(null);
 
   // Tarik Sitename dan Link Offer dari database
+    // Tarik Sitename dan Link Offer dari database (Biarkan kode ini seperti semula)
   useEffect(() => {
     async function fetchSettings() {
       const { data } = await supabase.from('settings').select('sitename, link_offer').eq('id', 1).single();
@@ -29,10 +30,32 @@ export default function Home() {
     fetchSettings();
   }, []);
 
-  // 1. Fungsi saat tombol "Upload Video" diklik
+  // 1. Fungsi asli kamu untuk buka file picker (Biarkan seperti ini)
   const bukaFilePicker = () => {
     if (fileInputRef.current) fileInputRef.current.click();
   };
+
+  // 2. Tambahkan fungsi baru ini untuk memicu iklan Monetag
+  const handleUploadClick = () => {
+    // Pastikan script Monetag sudah dimuat oleh browser
+    if (typeof window !== 'undefined' && window.show_10806273) {
+      window.show_10806273()
+        .then(() => {
+          // Iklan selesai ditonton/ditutup -> Jalankan fungsi buka file picker milikmu
+          bukaFilePicker();
+        })
+        .catch((err) => {
+          // Jika iklan di-block (misal pakai AdBlocker), tetap buka file picker 
+          // supaya proses upload tidak macet dan web tetap terasa mulus.
+          console.error("Iklan gagal dimuat:", err);
+          bukaFilePicker();
+        });
+    } else {
+      // Jika internet lambat dan script Monetag belum siap, langsung buka file picker
+      bukaFilePicker();
+    }
+  };
+
 
   // 2. Fungsi saat file dipilih (Persis kayak Javascript asli lo)
   const handleFileChange = (e) => {
