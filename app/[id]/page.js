@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
-import { notFound } from 'next/navigation';
+import { notFound, useRouter } from 'next/navigation'; // <-- Tambahin useRouter di sini
 
 export default function HalamanTonton({ params }) {
   const resolvedParams = use(params);
   const videoId = resolvedParams.id;
+  const router = useRouter(); // <-- Panggil routernya buat pindah halaman
 
   const [videoData, setVideoData] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -42,39 +43,43 @@ export default function HalamanTonton({ params }) {
     }
   }, [settings?.ads_native, loading]);
 
-if (error) return notFound();
-if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
+  if (error) return notFound();
+  if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
 
   const domainURL = `https://${settings?.domain || 'domain.com'}`;
   const streamUrl = `${domainURL}/${videoId}`;
   const imageUrl = `${domainURL}/${videoId}.jpg`;
   const embedUrl = `${domainURL}/embed/${videoId}`;
   
-  // ==========================================
-  // FIX: MAKSA BROWSER BUAT LANGSUNG DOWNLOAD FILE!
-  // ==========================================
-    // Kode asli kamu untuk membuat link (Biarkan seperti ini)
   const downloadUrl = videoData.video 
     ? `${videoData.video}?download=${encodeURIComponent(videoData.title)}.mp4` 
     : '#';
 
-  // Fungsi baru untuk mencegat klik dan memunculkan iklan
   const handleDownloadClick = (e) => {
     e.preventDefault(); 
 
     if (downloadUrl === '#') return;
 
-    // FUNGSI YANG DIPERBARUI: Lebih rapih dan tahan blokir browser
+    // ==========================================
+    // LOGIKA BARU: Bikin Token & Lempar ke Halaman Download
+    // ==========================================
     const jalankanDownload = () => {
-      // Ini akan memaksa browser mengunduh file secara otomatis 
-      // di tab yang sama tanpa membuka tab kosong baru
-      window.location.href = downloadUrl; 
+      // 1. Bikin token super panjang & acak
+      const acak1 = Math.random().toString(36).substring(2, 15);
+      const acak2 = Math.random().toString(36).substring(2, 15);
+      const token = `dl-${Date.now().toString(36)}-${acak1}${acak2}`;
+
+      // 2. Simpan token ke dalam Cookie pengunjung (umur 5 menit aja)
+      document.cookie = `dl_token_${videoId}=${token}; path=/; max-age=300;`;
+
+      // 3. Pindah ke halaman khusus download bawa tokennya
+      router.push(`/download/${videoId}?token=${token}`);
     };
 
+    // Logika iklan Monetag lo tetep aman sentosa di sini
     if (typeof window !== 'undefined' && window.show_10806273) {
       window.show_10806273()
         .then(() => {
-          // Fungsi ini jalan TEPAT setelah user selesai dengan iklan Monetag
           jalankanDownload();
         })
         .catch((err) => {
@@ -139,16 +144,14 @@ if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
               <span className="badge-flag" onClick={() => setIsModalOpen(true)} style={{cursor: 'pointer'}}>Flag video</span>
             </div>
             
-            {/* FIX: Hapus target="_blank" biar gak buka tab baru */}
             <a 
-            href={downloadUrl} 
-            className="btn-download" 
-            onClick={handleDownloadClick}
-             >
-            Download full Video
-             </a>
+              href="#" 
+              className="btn-download" 
+              onClick={handleDownloadClick}
+            >
+              Download full Video
+            </a>
 
-          
           </div>
         </div>
 
@@ -178,7 +181,6 @@ if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
           <a href="/terms">Terms of Service</a>
           <a href="/privacy">Privacy Policy</a>
           <a href="/dmca">DMCA</a>
-          
         </div>
         <div className="footer-copyright">
           {settings?.sitename || 'StreamHG'} Copyright © {new Date().getFullYear()}. All rights reserved.
