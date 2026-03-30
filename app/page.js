@@ -105,8 +105,8 @@ export default function Home() {
             <h1>Upload your videos and share</h1>
             <p className="subtitle">Free and simple premium video hosting.</p>
             
-            <button className="btn-upload" onClick={bukaFilePicker}>
-                Upload Video
+            <button className="btn-upload" onClick={handleUploadClick}>
+             Upload Video
             </button>
             {/* Input file disembunyikan pakai CSS asli lu, event onChange dipasang di sini */}
             <input 
