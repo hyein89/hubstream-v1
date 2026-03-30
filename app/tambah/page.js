@@ -9,7 +9,6 @@ export default function TambahVideo() {
   const [loading, setLoading] = useState(false);
   const [idSukses, setIdSukses] = useState(null);
   
-  // State untuk Notifikasi & Tombol Copy
   const [notif, setNotif] = useState({ tampil: false, pesan: '', tipe: 'sukses' });
   const [copyText, setCopyText] = useState('Copy Link');
 
@@ -24,7 +23,7 @@ export default function TambahVideo() {
       setFile(selected);
       setTitle(selected.name.replace(/\.[^/.]+$/, ""));
       setIdSukses(null);
-      setCopyText('Copy Link'); // Reset teks tombol copy
+      setCopyText('Copy Link');
     }
   };
 
@@ -33,7 +32,7 @@ export default function TambahVideo() {
     navigator.clipboard.writeText(fullURL);
     setCopyText('Copied!');
     tampilkanNotif('Link berhasil disalin ke clipboard!', 'sukses');
-    setTimeout(() => setCopyText('Copy Link'), 2000); // Balikin teks tombol setelah 2 detik
+    setTimeout(() => setCopyText('Copy Link'), 2000);
   };
 
   const uploadProses = async () => {
@@ -43,23 +42,38 @@ export default function TambahVideo() {
 
     try {
       const id = Math.random().toString(36).substring(2, 8);
+      
+      // ==========================================
+      // FIX: LOGIKA THUMBNAIL ANTI LAYAR HITAM
+      // ==========================================
       const video = document.createElement('video');
       video.src = URL.createObjectURL(file);
-      await new Promise(r => video.onloadeddata = r);
-      video.currentTime = 1;
+      
+      // Tunggu data video kebaca penuh biar tau total durasinya
+      await new Promise(r => video.onloadedmetadata = r);
+      
+      // Kalau videonya lebih dari 6 detik, ambil jepretan di detik ke-3.
+      // Kalau videonya pendek banget, ambil jepretan pas di tengah-tengahnya.
+      video.currentTime = video.duration > 6 ? 3 : video.duration / 2;
+      
       await new Promise(r => video.onseeked = r);
+      
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       canvas.getContext('2d').drawImage(video, 0, 0);
-      const blobImage = await new Promise(r => canvas.toBlob(r, 'image/jpeg'));
+      
+      // Tambahin kualitas 0.8 biar file gambar lebih ringan di-load
+      const blobImage = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
 
+      // Upload ke Storage
       await supabase.storage.from('videos').upload(`${id}.mp4`, file);
       await supabase.storage.from('thumbnails').upload(`${id}.jpg`, blobImage);
 
       const urlVideo = supabase.storage.from('videos').getPublicUrl(`${id}.mp4`).data.publicUrl;
       const urlImage = supabase.storage.from('thumbnails').getPublicUrl(`${id}.jpg`).data.publicUrl;
 
+      // Simpan ke SQL
       await supabase.from('videos').insert([{
         id, title, image: urlImage, video: urlVideo, hitcound: 0
       }]);
@@ -77,7 +91,6 @@ export default function TambahVideo() {
 
   return (
     <div style={{ background: '#0d1117', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      {/* CSS GLOBAL (Copy dari halaman setting) */}
       <style jsx global>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body, html { background-color: #0d1117 !important; margin: 0; padding: 0; }
@@ -115,7 +128,6 @@ export default function TambahVideo() {
         }
       `}</style>
 
-      {/* NOTIFIKASI KUSTOM */}
       {notif.tampil && (
         <div className={`notif-toast ${notif.tipe === 'sukses' ? 'notif-sukses' : 'notif-error'}`}>
           {notif.tipe === 'sukses' ? (
@@ -127,7 +139,6 @@ export default function TambahVideo() {
         </div>
       )}
 
-      {/* TOP NAVIGATION BAR */}
       <nav className="nav-container">
         <Link href="/" className="nav-brand">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#238636" strokeWidth="2" strokeLinecap="square"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
@@ -141,12 +152,10 @@ export default function TambahVideo() {
         </div>
       </nav>
 
-      {/* MAIN CONTENT AREA */}
       <div className="main-content">
         <div className="card">
           <h2 style={{ color: '#fff', marginTop: 0, marginBottom: '25px', fontSize: '24px', fontWeight: 'bold' }}>Tambah Video Baru</h2>
           
-          {/* AREA UPLOAD STYLED */}
           <input type="file" id="fileInput" accept="video/*" onChange={handleFile} style={{ display: 'none' }} />
           <label htmlFor="fileInput" style={{
             border: file ? '2px solid #fff' : '2px dashed #30363d',
@@ -201,7 +210,6 @@ export default function TambahVideo() {
             )}
           </button>
 
-          {/* AREA JIKA SUKSES (Dalam card) */}
           {idSukses && (
             <div style={{ marginTop: '25px', padding: '20px', backgroundColor: '#0d1117', border: '1px solid #2ea043' }}>
               <div style={{ color: '#2ea043', fontWeight: 'bold', fontSize: '16px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -212,7 +220,6 @@ export default function TambahVideo() {
               <div style={{ background: '#21262d', padding: '10px', color: '#fff', fontSize: '14px', fontFamily: 'monospace', textOverflow: 'ellipsis', overflow: 'hidden', marginBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 {`/${idSukses}`}
                 
-                {/* Tombol Copy Link */}
                 <button onClick={salinLink} style={{ background: copyText === 'Copied!' ? '#2ea043' : '#0d1117', color: '#fff', border: 'none', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                   {copyText}
