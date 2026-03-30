@@ -1,4 +1,5 @@
 'use client';
+import { notFound } from 'next/navigation';
 import { useEffect, useState, use, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Script from 'next/script';
@@ -103,8 +104,8 @@ export default function EmbedPlayer({ params }) {
     }
   }, [fluidLoaded, videoData, settings, videoId]);
 
-  if (error) return <div style={{ color: '#fff', background: '#000', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>404 Not Found</div>;
-
+  if (error) return notFound();
+  
   return (
     <>
       <link rel="stylesheet" href="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.css" type="text/css" />
