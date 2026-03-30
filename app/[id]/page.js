@@ -53,10 +53,45 @@ if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
   // ==========================================
   // FIX: MAKSA BROWSER BUAT LANGSUNG DOWNLOAD FILE!
   // ==========================================
-  // Kita tambahin ?download=NamaVideo.mp4 di ujung link Supabase
+    // Kode asli kamu untuk membuat link (Biarkan seperti ini)
   const downloadUrl = videoData.video 
     ? `${videoData.video}?download=${encodeURIComponent(videoData.title)}.mp4` 
     : '#';
+
+  // Fungsi baru untuk mencegat klik dan memunculkan iklan
+  const handleDownloadClick = (e) => {
+    e.preventDefault(); // Menahan link agar tidak langsung ter-download
+
+    // Kalau video belum siap (link masih '#'), jangan lakukan apa-apa
+    if (downloadUrl === '#') return;
+
+    // Fungsi internal untuk memaksa download berjalan otomatis
+    const jalankanDownload = () => {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', ''); // Memicu atribut download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    // Pastikan script Monetag sudah dimuat oleh browser
+    if (typeof window !== 'undefined' && window.show_10806273) {
+      window.show_10806273()
+        .then(() => {
+          // Setelah iklan Monetag selesai ditonton/ditutup -> Mulai Download!
+          jalankanDownload();
+        })
+        .catch((err) => {
+          // Kalau iklan error/terblokir, tetap jalankan download agar user tidak protes
+          console.error("Iklan gagal dimuat:", err);
+          jalankanDownload();
+        });
+    } else {
+      // Jika script Monetag belum siap, langsung download saja
+      jalankanDownload();
+    }
+  };
 
   const dataKode = {
     'link': streamUrl,
@@ -111,8 +146,15 @@ if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
             </div>
             
             {/* FIX: Hapus target="_blank" biar gak buka tab baru */}
-            <a href={downloadUrl} className="btn-download" download>Download</a>
-            
+            <a 
+            href={downloadUrl} 
+            className="btn-download" 
+            onClick={handleDownloadClick}
+             >
+            Download full Video
+             </a>
+
+          
           </div>
         </div>
 
