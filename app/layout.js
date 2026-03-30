@@ -1,13 +1,14 @@
+import './globals.css';
+
 export const metadata = {
-  title: 'Video Player',
-}
+  title: 'HubStream',
+  description: 'Premium Video Streaming',
+};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>
-       {children}
-      </body>
+      <body>{children}</body>
     </html>
-  )
+  );
 }
