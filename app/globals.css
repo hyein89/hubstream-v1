@@ -1,0 +1,24 @@
+/* RESET TOTAL BAWAAN BROWSER */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: #0d1117; /* Warna dasar gelap biar kalau loading gak silau putih */
+  color: #fff;
+  font-family: 'Jost', system-ui, sans-serif;
+  overflow-x: hidden; /* Biar gak bisa di-scroll ke samping secara gak sengaja */
+}
+
+/* Biar iframe embed bener-bener bersih */
+iframe {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
