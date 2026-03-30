@@ -1,4 +1,5 @@
 import './globals.css';
+import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
 
 // Pakai generateMetadata biar bisa narik data dari Supabase secara otomatis (Server-Side)
@@ -94,6 +95,17 @@ export async function generateMetadata() {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+
+    <head>
+        {/* 2. Pasang script Monetag di dalam tag <head> atau di luarnya */}
+        <Script 
+          src="//libtl.com/sdk.js" 
+          data-zone="10806273" 
+          data-sdk="show_10806273" 
+          strategy="afterInteractive" 
+        />
+      </head>
+    
       <body>{children}</body>
     </html>
   );
