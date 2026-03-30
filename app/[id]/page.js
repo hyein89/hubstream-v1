@@ -2,6 +2,9 @@
 import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// INI OBATNYA: Import CSS langsung gaya Next.js biar gak FOUC/Delay
+import './stream.css'; 
+
 export default function HalamanTonton({ params }) {
   const resolvedParams = use(params);
   const videoId = resolvedParams.id;
@@ -28,11 +31,10 @@ export default function HalamanTonton({ params }) {
     fetchData();
   }, [videoId]);
 
-  // TRIK EKSEKUSI SCRIPT IKLAN NATIVE BIAR GAK DIBLOKIR REACT
   useEffect(() => {
     const adContainer = document.getElementById('native-ad-container');
     if (adContainer && settings?.ads_native) {
-      adContainer.innerHTML = ''; // Bersihkan div-nya dulu
+      adContainer.innerHTML = ''; 
       try {
         const fragment = document.createRange().createContextualFragment(settings.ads_native);
         adContainer.appendChild(fragment);
@@ -65,9 +67,6 @@ export default function HalamanTonton({ params }) {
 
   return (
     <>
-      <link rel="stylesheet" href="/stream.css" type="text/css" />
-      
-      {/* PAKSA BACKGROUND JADI GELAP, BUNUH CSS BAWAAN NEXT.JS */}
       <style jsx global>{`
         body, html {
           background-color: #0d1117 !important;
@@ -117,13 +116,10 @@ export default function HalamanTonton({ params }) {
           <textarea id="code-output" className="code-textarea" readOnly value={dataKode[activeTab]} />
         </div>
 
-        {/* AREA IKLAN NATIVE BANNER DENGAN SCRIPT INJECTOR */}
         <div className="native-ad-area">
           <div className="ad-label">Advertisement</div>
           {settings?.ads_native ? (
-            <div id="native-ad-container" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-              {/* Script iklan lo bakal disuntik otomatis ke dalam kotak ini */}
-            </div>
+            <div id="native-ad-container" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}></div>
           ) : (
             <img src="https://via.placeholder.com/728x90.png?text=Tempat+Native+Ads+Banner" style={{ maxWidth: '100%', height: 'auto', borderRadius: '0' }} alt="Ads" />
           )}
