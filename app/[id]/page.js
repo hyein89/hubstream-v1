@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
+import { notFound } from 'next/navigation';
 
 export default function HalamanTonton({ params }) {
   const resolvedParams = use(params);
@@ -41,8 +42,8 @@ export default function HalamanTonton({ params }) {
     }
   }, [settings?.ads_native, loading]);
 
-  if (error) return <div style={{ color: '#fff', background: '#000', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>404 Not Found</div>;
-  if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
+if (error) return notFound();
+if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
 
   const domainURL = `https://${settings?.domain || 'domain.com'}`;
   const streamUrl = `${domainURL}/${videoId}`;
