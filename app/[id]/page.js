@@ -139,9 +139,9 @@ if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
 
       <footer className="footer-area">
         <div className="footer-links">
-          <a href="#">Terms of Service</a>
-          <a href="#">Privacy Policy</a>
-          <a href="#">DMCA</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dmca">DMCA</a>
           
         </div>
         <div className="footer-copyright">
