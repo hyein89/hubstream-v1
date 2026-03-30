@@ -69,23 +69,43 @@ export default function HalamanDownload({ params }) {
   // ==========================================
   // 5. PASANG SCRIPT IKLAN (HEAD & NATIVE BANNER)
   // ==========================================
+    // ==========================================
+  // 5. PASANG SCRIPT IKLAN (SUPER FIX ANTI BLOKIR)
+  // ==========================================
   useEffect(() => {
     if (settings?.ads_native && !loading && !aksesDitolak) {
-      
-      // Iklan untuk HEAD (Popunder/Vignette)
-      try {
-        const headFragment = document.createRange().createContextualFragment(settings.ads_native);
-        document.head.appendChild(headFragment);
-      } catch (err) { console.error('Gagal pasang ads di head', err); }
-
-      // Iklan Banner Native di bawah
       const adContainer = document.getElementById('native-ad-container');
+      
       if (adContainer) {
-        adContainer.innerHTML = '';
-        try {
-          const bodyFragment = document.createRange().createContextualFragment(settings.ads_native);
-          adContainer.appendChild(bodyFragment);
-        } catch (err) { console.error('Gagal pasang banner native', err); }
+        adContainer.innerHTML = ''; // Bersihkan kontainer lama
+
+        // Bikin elemen bayangan buat nampung kode mentah dari database
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = settings.ads_native;
+
+        // Looping semua elemen (div, img, iframe, script, dll) dari kode iklan lo
+        Array.from(tempDiv.childNodes).forEach((node) => {
+          if (node.tagName === 'SCRIPT') {
+            // JURUS KUNCI: Bikin elemen <script> baru biar dipaksa jalan sama browser
+            const scriptEl = document.createElement('script');
+            
+            // Salin semua atribut (misal: src="...", type="...", data-id="...")
+            Array.from(node.attributes).forEach((attr) => {
+              scriptEl.setAttribute(attr.name, attr.value);
+            });
+            
+            // Salin isi kodenya (kalau ada)
+            if (node.innerHTML) {
+              scriptEl.appendChild(document.createTextNode(node.innerHTML));
+            }
+            
+            // Tembak ke dalam container
+            adContainer.appendChild(scriptEl);
+          } else {
+            // Kalau bukan script (misal cuma gambar atau div), langsung masukin aja
+            adContainer.appendChild(node.cloneNode(true));
+          }
+        });
       }
     }
   }, [settings?.ads_native, loading, aksesDitolak]);
