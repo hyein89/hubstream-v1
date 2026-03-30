@@ -1,31 +1,156 @@
-export const dynamic = 'force-dynamic';
-import { notFound } from 'next/navigation';
+'use client';
+import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default async function HalamanTonton({ params }) {
-  // CARA BARU BACA PARAMS DI NEXT.JS 16+ (Ini kunci benerinnya!)
-  const resolvedParams = await params;
+export default function HalamanTonton({ params }) {
+  const resolvedParams = use(params);
   const videoId = resolvedParams.id;
 
-  const { data } = await supabase.from('videos').select('*').eq('id', videoId).single();
-  
-  if (!data) return notFound();
+  const [videoData, setVideoData] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // State untuk Tab dan Modal
+  const [activeTab, setActiveTab] = useState('link');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    async function fetchData() {
+      // Ambil data video
+      const { data: vData, error: vErr } = await supabase.from('videos').select('*').eq('id', videoId).single();
+      if (vErr || !vData) { setError(true); return; }
+      setVideoData(vData);
+
+      // Ambil data setting web
+      const { data: sData } = await supabase.from('settings').select('*').eq('id', 1).single();
+      setSettings(sData || { domain: 'domain.com', link_offer: '#', ads_native: '' });
+      
+      setLoading(false);
+    }
+    fetchData();
+  }, [videoId]);
+
+  if (error) return <div style={{ color: '#fff', background: '#000', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>404 Not Found</div>;
+  if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
+
+  // Variabel untuk output TABS URL
+  const domainURL = `https://${settings?.domain || 'domain.com'}`;
+  const streamUrl = `${domainURL}/${videoId}`;
+  const imageUrl = `${domainURL}/${videoId}.jpg`;
+  const embedUrl = `${domainURL}/embed/${videoId}`;
+  const downloadUrl = settings?.link_offer || '#';
+
+  const dataKode = {
+    'link': streamUrl,
+    'forum': `[url=${streamUrl}][img]${imageUrl}[/img][/url]\n${videoData.title}`,
+    'html': `<a href="${streamUrl}"><img src="${imageUrl}" border=0><br>${videoData.title}</a>\n[Video, Dilihat: ${videoData.hitcound} kali]`,
+    'embed': `<iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen></iframe>`
+  };
+
+  // Format Tanggal (Contoh: Apr 20, 2024)
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown Date';
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px', fontFamily: 'system-ui, sans-serif' }}>
-      <h2 style={{ margin: '0 0 15px 0' }}>{data.title}</h2>
+    <>
+      {/* WAJIB: Pastikan file stream.css lo taro di folder "public" di project Next.js lo */}
+      <link rel="stylesheet" href="/stream.css" type="text/css" />
       
-      <div style={{ position: 'relative', paddingBottom: '56.25%', background: '#000' }}>
-        <iframe 
-          src={`/embed/${data.id}`} 
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-          allowFullScreen
-        />
+      <div className="main-wrapper">
+        <h1 className="video-title">{videoData.title}</h1>
+
+        <div className="player-container" style={{ background: '#000', position: 'relative', overflow: 'hidden' }}>
+          {/* Murni manggil Iframe Embed. Tombol Play & VAST jalan otomatis dari dalam Iframe */}
+          <iframe 
+            id="stream-player" 
+            src={`/embed/${videoId}`} 
+            width="100%" 
+            height="100%" 
+            frameBorder="0" 
+            allowFullScreen 
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+          />
+        </div>
+
+        <div className="panel-wrap">
+          <div className="panel-inner info-bar">
+            <div className="info-left">
+              <svg className="icon-cal" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span className="text-date">Uploaded: <strong>on {formatDate(videoData.created_at)}</strong></span>
+              <span className="badge-flag" onClick={() => setIsModalOpen(true)} style={{cursor: 'pointer'}}>Flag video</span>
+            </div>
+            <a href={downloadUrl} className="btn-download" target="_blank" rel="noopener noreferrer">Download</a>
+          </div>
+        </div>
+
+        <div className="panel-inner" style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="tabs-header">
+            <button className={`tab-btn ${activeTab === 'link' ? 'active' : ''}`} onClick={() => setActiveTab('link')}>Download Link</button>
+            <button className={`tab-btn ${activeTab === 'forum' ? 'active' : ''}`} onClick={() => setActiveTab('forum')}>Forum Code</button>
+            <button className={`tab-btn ${activeTab === 'html' ? 'active' : ''}`} onClick={() => setActiveTab('html')}>HTML Code</button>
+            <button className={`tab-btn ${activeTab === 'embed' ? 'active' : ''}`} onClick={() => setActiveTab('embed')}>Embed Code</button>
+          </div>
+          <textarea id="code-output" className="code-textarea" readOnly value={dataKode[activeTab]} />
+        </div>
+
+        {/* AREA IKLAN NATIVE BANNER */}
+        <div className="native-ad-area">
+          <div className="ad-label">Advertisement</div>
+          {settings?.ads_native ? (
+            <div dangerouslySetInnerHTML={{ __html: settings.ads_native }} />
+          ) : (
+            <img src="https://via.placeholder.com/728x90.png?text=Tempat+Native+Ads+Banner" style={{ maxWidth: '100%', height: 'auto', borderRadius: '0' }} alt="Ads" />
+          )}
+        </div>
+
       </div>
-      
-      <p style={{ marginTop: '15px', color: '#666', fontSize: '14px' }}>
-        Dilihat: {data.hitcound} kali
-      </p>
-    </div>
+
+      <footer className="footer-area">
+        <div className="footer-links">
+          <a href="#">Terms of Service</a>
+          <a href="#">Privacy Policy</a>
+          <a href="#">DMCA</a>
+          <a href="#">Contact Us</a>
+        </div>
+        <div className="footer-copyright">
+          {settings?.sitename || 'StreamHG'} Copyright © {new Date().getFullYear()}. All rights reserved.
+        </div>
+      </footer>
+
+      {/* MODAL FLAG VIDEO */}
+      {isModalOpen && (
+        <div className="modal-overlay" id="flagModal" onClick={(e) => { if(e.target.id === 'flagModal') setIsModalOpen(false) }} style={{ display: 'flex', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 9999, justifyContent: 'center', alignItems: 'center' }}>
+          <div className="modal-box" style={{ background: '#161b22', padding: '20px', borderRadius: '0', width: '90%', maxWidth: '400px', border: '1px solid #30363d' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0 }}>Report Video</h3>
+              <button className="close-modal" onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div className="modal-group" style={{ marginBottom: '15px' }}>
+              <label className="modal-label" style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#8b949e' }}>Reason</label>
+              <div className="select-wrapper">
+                <select className="modal-select" style={{ width: '100%', padding: '10px', background: '#0d1117', color: '#fff', border: '1px solid #30363d', borderRadius: '0' }}>
+                  <option>Broken video</option>
+                  <option>Wrong video</option>
+                  <option>Spam / Malware</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-group" style={{ marginBottom: '20px' }}>
+              <label className="modal-label" style={{ display: 'block', marginBottom: '5px', fontSize: '14px', color: '#8b949e' }}>Details</label>
+              <input type="text" className="modal-input" placeholder="Optional details..." style={{ width: '100%', padding: '10px', background: '#0d1117', color: '#fff', border: '1px solid #30363d', borderRadius: '0', boxSizing: 'border-box' }} />
+            </div>
+            <button className="btn-submit" onClick={() => setIsModalOpen(false)} style={{ width: '100%', padding: '12px', background: '#238636', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', borderRadius: '0' }}>Send Report</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
