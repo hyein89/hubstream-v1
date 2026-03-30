@@ -49,8 +49,13 @@ export default function HalamanTonton({ params }) {
   const imageUrl = `${domainURL}/${videoId}.jpg`;
   const embedUrl = `${domainURL}/embed/${videoId}`;
   
-  // INI UDAH DIBENERIN: Tombol download ngarah langsung ke link video aslinya
-  const downloadUrl = videoData.video || '#';
+  // ==========================================
+  // FIX: MAKSA BROWSER BUAT LANGSUNG DOWNLOAD FILE!
+  // ==========================================
+  // Kita tambahin ?download=NamaVideo.mp4 di ujung link Supabase
+  const downloadUrl = videoData.video 
+    ? `${videoData.video}?download=${encodeURIComponent(videoData.title)}.mp4` 
+    : '#';
 
   const dataKode = {
     'link': streamUrl,
@@ -66,7 +71,6 @@ export default function HalamanTonton({ params }) {
 
   return (
     <>
-      {/* Panggil CSS dari folder public pakai cara Next.js 14+ biar gak error di Vercel */}
       <link rel="stylesheet" href="/stream.css" precedence="default" />
       
       <style jsx global>{`
@@ -104,8 +108,10 @@ export default function HalamanTonton({ params }) {
               <span className="text-date">Uploaded: <strong>on {formatDate(videoData.created_at)}</strong></span>
               <span className="badge-flag" onClick={() => setIsModalOpen(true)} style={{cursor: 'pointer'}}>Flag video</span>
             </div>
-            {/* Tombol Download Buka Tab Baru */}
-            <a href={downloadUrl} className="btn-download" target="_blank" rel="noopener noreferrer">Download</a>
+            
+            {/* FIX: Hapus target="_blank" biar gak buka tab baru */}
+            <a href={downloadUrl} className="btn-download" download>Download</a>
+            
           </div>
         </div>
 
@@ -135,7 +141,7 @@ export default function HalamanTonton({ params }) {
           <a href="#">Terms of Service</a>
           <a href="#">Privacy Policy</a>
           <a href="#">DMCA</a>
-          <a href="#">Contact Us</a>
+          
         </div>
         <div className="footer-copyright">
           {settings?.sitename || 'StreamHG'} Copyright © {new Date().getFullYear()}. All rights reserved.
