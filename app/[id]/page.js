@@ -2,9 +2,6 @@
 import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// INI OBATNYA: Import CSS langsung gaya Next.js biar gak FOUC/Delay
-import './stream.css'; 
-
 export default function HalamanTonton({ params }) {
   const resolvedParams = use(params);
   const videoId = resolvedParams.id;
@@ -51,7 +48,9 @@ export default function HalamanTonton({ params }) {
   const streamUrl = `${domainURL}/${videoId}`;
   const imageUrl = `${domainURL}/${videoId}.jpg`;
   const embedUrl = `${domainURL}/embed/${videoId}`;
-  const downloadUrl = settings?.link_offer || '#';
+  
+  // INI UDAH DIBENERIN: Tombol download ngarah langsung ke link video aslinya
+  const downloadUrl = videoData.video || '#';
 
   const dataKode = {
     'link': streamUrl,
@@ -67,6 +66,9 @@ export default function HalamanTonton({ params }) {
 
   return (
     <>
+      {/* Panggil CSS dari folder public pakai cara Next.js 14+ biar gak error di Vercel */}
+      <link rel="stylesheet" href="/stream.css" precedence="default" />
+      
       <style jsx global>{`
         body, html {
           background-color: #0d1117 !important;
@@ -102,6 +104,7 @@ export default function HalamanTonton({ params }) {
               <span className="text-date">Uploaded: <strong>on {formatDate(videoData.created_at)}</strong></span>
               <span className="badge-flag" onClick={() => setIsModalOpen(true)} style={{cursor: 'pointer'}}>Flag video</span>
             </div>
+            {/* Tombol Download Buka Tab Baru */}
             <a href={downloadUrl} className="btn-download" target="_blank" rel="noopener noreferrer">Download</a>
           </div>
         </div>
