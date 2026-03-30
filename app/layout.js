@@ -97,6 +97,11 @@ export default function RootLayout({ children }) {
     <html lang="en">
 
     <head>
+       <Script 
+          src="https://telegram.org/js/telegram-web-app.js" 
+          strategy="beforeInteractive" 
+        />
+    
         {/* 2. Pasang script Monetag di dalam tag <head> atau di luarnya */}
         <Script 
           src="//libtl.com/sdk.js" 
