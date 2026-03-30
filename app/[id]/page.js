@@ -60,38 +60,32 @@ if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
 
   // Fungsi baru untuk mencegat klik dan memunculkan iklan
   const handleDownloadClick = (e) => {
-    e.preventDefault(); // Menahan link agar tidak langsung ter-download
+    e.preventDefault(); 
 
-    // Kalau video belum siap (link masih '#'), jangan lakukan apa-apa
     if (downloadUrl === '#') return;
 
-    // Fungsi internal untuk memaksa download berjalan otomatis
+    // FUNGSI YANG DIPERBARUI: Lebih rapih dan tahan blokir browser
     const jalankanDownload = () => {
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.setAttribute('download', ''); // Memicu atribut download
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Ini akan memaksa browser mengunduh file secara otomatis 
+      // di tab yang sama tanpa membuka tab kosong baru
+      window.location.href = downloadUrl; 
     };
 
-    // Pastikan script Monetag sudah dimuat oleh browser
     if (typeof window !== 'undefined' && window.show_10806273) {
       window.show_10806273()
         .then(() => {
-          // Setelah iklan Monetag selesai ditonton/ditutup -> Mulai Download!
+          // Fungsi ini jalan TEPAT setelah user selesai dengan iklan Monetag
           jalankanDownload();
         })
         .catch((err) => {
-          // Kalau iklan error/terblokir, tetap jalankan download agar user tidak protes
           console.error("Iklan gagal dimuat:", err);
           jalankanDownload();
         });
     } else {
-      // Jika script Monetag belum siap, langsung download saja
       jalankanDownload();
     }
   };
+
 
   const dataKode = {
     'link': streamUrl,
