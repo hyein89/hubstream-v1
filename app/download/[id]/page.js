@@ -70,57 +70,60 @@ export default function HalamanDownload({ params }) {
   // 5. PASANG SCRIPT IKLAN (HEAD & NATIVE BANNER)
   // ==========================================
   // ==========================================
-  // 5. PASANG SCRIPT IKLAN (PISAH BANNER & POPUNDER)
+    // ==========================================
+  // 5. PASANG SCRIPT IKLAN (DUAL CORE: NATIVE & HEAD/POPUNDER)
   // ==========================================
   useEffect(() => {
-    if (settings?.ads_native && !loading && !aksesDitolak) {
-      const adContainer = document.getElementById('native-ad-container');
-      
-      // Bikin tempat sementara buat ngebedah kode dari database
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = settings.ads_native;
+    if (loading || aksesDitolak) return;
 
-      // 1. Ambil semua elemen SELAIN script (misal: gambar banner, link <a>)
-      const elemenVisual = Array.from(tempDiv.childNodes).filter(node => node.tagName !== 'SCRIPT');
-      
-      // Masukin elemen visual ke dalam kotak container
+    // --- JALUR 1: PASANG IKLAN NATIVE BANNER (KOTAK BAWAH) ---
+    if (settings?.ads_native) {
+      const adContainer = document.getElementById('native-ad-container');
       if (adContainer) {
         adContainer.innerHTML = ''; 
-        elemenVisual.forEach(node => adContainer.appendChild(node.cloneNode(true)));
-      }
+        const tempDivNative = document.createElement('div');
+        tempDivNative.innerHTML = settings.ads_native;
 
-      // 2. Ambil khusus elemen SCRIPT (Popunder / Vignette)
-      const elemenScript = tempDiv.querySelectorAll('script');
-      
-      elemenScript.forEach(scriptLama => {
-        // Bikin tag script baru biar browser mau ngejalanin
-        const scriptBaru = document.createElement('script');
-        
-        // Salin src="https://hatsharmony..."
-        Array.from(scriptLama.attributes).forEach(attr => {
-          scriptBaru.setAttribute(attr.name, attr.value);
+        Array.from(tempDivNative.childNodes).forEach(node => {
+          if (node.tagName === 'SCRIPT') {
+            // Kalau banner native-nya pakai script JS, kita paksa jalan
+            const scriptBanner = document.createElement('script');
+            Array.from(node.attributes).forEach(attr => scriptBanner.setAttribute(attr.name, attr.value));
+            if (node.innerHTML) scriptBanner.innerHTML = node.innerHTML;
+            adContainer.appendChild(scriptBanner);
+          } else {
+            // Kalau cuma banner gambar HTML biasa
+            adContainer.appendChild(node.cloneNode(true));
+          }
         });
-        
-        // Salin isi script kalau ada
-        if (scriptLama.innerHTML) {
-          scriptBaru.innerHTML = scriptLama.innerHTML;
-        }
-
-        // Tandain scriptnya biar gampang dihapus nanti
-        scriptBaru.className = 'script-iklan-popunder';
-        
-        // TEMBAK LANGSUNG KE BODY BIAR BEBAS NANGKEP KLIK!
-        document.body.appendChild(scriptBaru);
-      });
-
-      // 3. CLEANUP: Hapus script popunder kalau user pindah halaman 
-      // biar iklannya gak dobel-dobel numpuk di background
-      return () => {
-        const scriptTuntaskan = document.querySelectorAll('.script-iklan-popunder');
-        scriptTuntaskan.forEach(s => s.remove());
-      };
+      }
     }
-  }, [settings?.ads_native, loading, aksesDitolak]);
+
+    // --- JALUR 2: PASANG IKLAN POPUNDER (DARI ADS_HEAD) ---
+    if (settings?.ads_head) {
+      const tempDivHead = document.createElement('div');
+      tempDivHead.innerHTML = settings.ads_head;
+
+      const elemenScriptHead = tempDivHead.querySelectorAll('script');
+      elemenScriptHead.forEach(scriptLama => {
+        const scriptPopunder = document.createElement('script');
+        Array.from(scriptLama.attributes).forEach(attr => scriptPopunder.setAttribute(attr.name, attr.value));
+        if (scriptLama.innerHTML) scriptPopunder.innerHTML = scriptLama.innerHTML;
+        
+        scriptPopunder.className = 'script-iklan-popunder';
+        document.body.appendChild(scriptPopunder);
+      });
+    }
+
+    // CLEANUP: Hapus popunder kalau user keluar halaman biar gak numpuk
+    return () => {
+      const scriptTuntaskan = document.querySelectorAll('.script-iklan-popunder');
+      scriptTuntaskan.forEach(s => s.remove());
+    };
+
+  // Pastikan ads_native dan ads_head dua-duanya dipantau
+  }, [settings?.ads_native, settings?.ads_head, loading, aksesDitolak]);
+
 
   
   if (loading) return <div style={{ background: '#0d1117', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff' }}>Checking Secure Connection...</div>;
