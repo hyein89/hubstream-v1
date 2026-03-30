@@ -125,13 +125,17 @@ export default function HalamanDownload({ params }) {
   
   if (loading) return <div style={{ background: '#0d1117', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff' }}>Checking Secure Connection...</div>;
 
-  if (aksesDitolak) return (
+    if (aksesDitolak) return (
     <div style={{ background: '#0d1117', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#da3633', fontFamily: 'system-ui, sans-serif' }}>
       <h1 style={{ fontSize: '32px', marginBottom: '10px' }}>403 Access Denied</h1>
-      <p style={{ color: '#8b949e', marginBottom: '20px', text-align: 'center' }}>Invalid or expired token. Please generate a new link from the video page.</p>
+      
+      {/* FIX: text-align diubah jadi textAlign */}
+      <p style={{ color: '#8b949e', marginBottom: '20px', textAlign: 'center' }}>Invalid or expired token. Please generate a new link from the video page.</p>
+      
       <button onClick={() => router.push(`/${videoId}`)} style={{ padding: '10px 20px', background: '#238636', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Return to Video</button>
     </div>
   );
+
 
   const downloadUrl = videoData?.video ? `${videoData.video}?download=${encodeURIComponent(videoData.title)}.mp4` : '#';
 
