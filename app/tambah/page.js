@@ -44,27 +44,49 @@ export default function TambahVideo() {
       const id = Math.random().toString(36).substring(2, 8);
       
       // ==========================================
-      // FIX: LOGIKA THUMBNAIL ANTI LAYAR HITAM
+      // FIX PERMANEN: LOGIKA THUMBNAIL ANTI HITAM
       // ==========================================
       const video = document.createElement('video');
       video.src = URL.createObjectURL(file);
-      
-      // Tunggu data video kebaca penuh biar tau total durasinya
+      video.muted = true;
+      video.playsInline = true;
+
       await new Promise(r => video.onloadedmetadata = r);
       
-      // Kalau videonya lebih dari 6 detik, ambil jepretan di detik ke-3.
-      // Kalau videonya pendek banget, ambil jepretan pas di tengah-tengahnya.
+      // Lompat ke detik ke-3
       video.currentTime = video.duration > 6 ? 3 : video.duration / 2;
       
+      // Tunggu sampai video benar-benar berpindah detik
       await new Promise(r => video.onseeked = r);
       
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      
-      // Tambahin kualitas 0.8 biar file gambar lebih ringan di-load
-      const blobImage = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
+      const blobImage = await new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+
+        let attempts = 0;
+        const capture = () => {
+          attempts++;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          // Ambil data pixel tengah untuk cek warna
+          const pixel = ctx.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data;
+          const isBlack = pixel[0] === 0 && pixel[1] === 0 && pixel[2] === 0;
+
+          // Jika tidak hitam atau sudah coba 20x, ambil hasilnya
+          if (!isBlack || attempts > 20) {
+            canvas.toBlob(r => resolve(r), 'image/jpeg', 0.8);
+          } else {
+            // Jika masih hitam, tunggu 100ms lalu jepret lagi
+            setTimeout(capture, 100);
+          }
+        };
+        capture();
+      });
+
+      // Bersihkan memory
+      URL.revokeObjectURL(video.src);
 
       // Upload ke Storage
       await supabase.storage.from('videos').upload(`${id}.mp4`, file);
