@@ -1,19 +1,21 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-// Panggil pakai path relatif biar gak error di Vercel
 import Header from './components/Header';
 import Footer from './components/Footer';
 
 export default function Home() {
   const [settings, setSettings] = useState({ sitename: 'SITENAME', link_offer: '#' });
   
-  // State untuk ngatur tampilan: 'idle' | 'uploading' | 'finished'
-  const [uploadState, setUploadState] = useState('idle');
-  const [progress, setProgress] = useState(0);
+  // Ambil referensi elemen persis kayak document.getElementById di HTML lo
   const fileInputRef = useRef(null);
+  const initialViewRef = useRef(null);
+  const progressViewRef = useRef(null);
+  const resultViewRef = useRef(null);
+  const progressBarRef = useRef(null);
+  const progressTextRef = useRef(null);
 
-  // Tarik Sitename dan Link Offer dari Seting Database
+  // Tarik Sitename dan Link Offer dari database
   useEffect(() => {
     async function fetchSettings() {
       const { data } = await supabase.from('settings').select('sitename, link_offer').eq('id', 1).single();
@@ -27,108 +29,97 @@ export default function Home() {
     fetchSettings();
   }, []);
 
+  // 1. Fungsi saat tombol "Upload Video" diklik
   const bukaFilePicker = () => {
     if (fileInputRef.current) fileInputRef.current.click();
   };
 
+  // 2. Fungsi saat file dipilih (Persis kayak Javascript asli lo)
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      // Sembunyikan tampilan awal, munculkan progress bar
-      setUploadState('uploading');
-      setProgress(0);
+      
+      // Sembunyikan tulisan besar dan tombol upload
+      if (initialViewRef.current) initialViewRef.current.style.display = 'none';
+      
+      // Tampilkan kotak progress bar
+      if (progressViewRef.current) progressViewRef.current.style.display = 'block';
 
-      let currentProgress = 0;
+      let progress = 0;
+      
       const simulasiUpload = setInterval(() => {
-        // Nambah persen secara acak antara 5% sampai 15% setiap detiknya
-        currentProgress += Math.floor(Math.random() * 10) + 5; 
-        if (currentProgress >= 100) currentProgress = 100;
+        progress += Math.floor(Math.random() * 10) + 5; 
         
-        // Update state progress
-        setProgress(currentProgress);
+        if (progress >= 100) progress = 100;
 
-        // Jika sudah 100%
-        if (currentProgress === 100) {
-          clearInterval(simulasiUpload); // Hentikan animasi
+        // Update lebar bar dan teks HTML-nya
+        if (progressBarRef.current) progressBarRef.current.style.width = progress + '%';
+        if (progressTextRef.current) progressTextRef.current.innerText = progress + '% • Uploading...';
+
+        if (progress === 100) {
+          clearInterval(simulasiUpload);
           
-          // Beri jeda 1 detik biar realistis, lalu munculkan jebakan
           setTimeout(() => {
-            // Sembunyikan bar, Munculkan tombol Create Account
-            setUploadState('finished');
+            if (progressViewRef.current) progressViewRef.current.style.display = 'none'; 
+            if (resultViewRef.current) resultViewRef.current.style.display = 'flex';   
           }, 1000); 
         }
-      }, 400); // Progress bar naik setiap 400 milidetik
+      }, 400); 
     }
   };
 
   return (
     <>
-      {/* MANGGIL FONT DAN CSS DARI PUBLIC SESUAI HTML LO */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet" />
       <link rel="stylesheet" href="/style.css" precedence="default" />
 
-      {/* HEADER KOMPONEN (Ngelimpar nama web dari setting database) */}
       <Header sitename={settings.sitename} />
 
       <main>
         
-        {/* TAMPILAN AWAL */}
-        {uploadState === 'idle' && (
-          <div id="initial-view">
+        <div id="initial-view" ref={initialViewRef}>
             <h1>Upload your videos and share</h1>
             <p className="subtitle">Free and simple premium video hosting.</p>
             
             <button className="btn-upload" onClick={bukaFilePicker}>
                 Upload Video
             </button>
+            {/* Input file disembunyikan pakai CSS asli lu, event onChange dipasang di sini */}
             <input 
               type="file" 
               id="file-input" 
-              ref={fileInputRef}
+              ref={fileInputRef} 
+              accept="video/mp4,video/x-m4v,video/*"
               onChange={handleFileChange}
-              accept="video/mp4,video/x-m4v,video/*" 
-              style={{ display: 'none' }} /* Disembunyikan agar tombol kustom berfungsi */
+              style={{ display: 'none' }}
             />
-          </div>
-        )}
+        </div>
 
-        {/* TAMPILAN PROGRESS BAR (Tambahkan class "upload-process-area" sesuai HTML asli) */}
-        {uploadState === 'uploading' && (
-          <div className="upload-process-area" id="progress-view">
+        <div className="upload-process-area" id="progress-view" ref={progressViewRef} style={{ display: 'none' }}>
             <div className="progress-title">Uploading Video...</div>
             <div className="progress-bar-bg">
-                {/* style interpolation untuk lebar progress */}
-                <div className="progress-fill" id="progress-bar" style={{ width: `${progress}%` }}></div>
+                <div className="progress-fill" id="progress-bar" ref={progressBarRef}></div>
             </div>
-            <div className="progress-text" id="progress-text">
-              {progress}% • {progress === 100 ? 'Calculating time remaining...' : 'Uploading...'}
-            </div>
-          </div>
-        )}
+            <div className="progress-text" id="progress-text" ref={progressTextRef}>0% • Calculating time remaining...</div>
+        </div>
 
-        {/* TAMPILAN JEBAKAN (Tambahkan class "result-area" sesuai HTML asli) */}
-        {uploadState === 'finished' && (
-          <div className="result-area" id="result-view">
+        <div className="result-area" id="result-view" ref={resultViewRef} style={{ display: 'none' }}>
             <div className="result-msg">Upload Paused!</div>
             <div className="result-desc">Guest uploads are limited. Please create a free account to finish processing and get your shareable link.</div>
             
-            {/* href narik dari setting database */}
             <a href={settings.link_offer} className="btn-create-account" target="_blank" rel="noopener noreferrer">
                 Create Free Account
             </a>
-          </div>
-        )}
+        </div>
 
         <article className="seo-article">
             <h2>The Best Way to Share Your Moments</h2>
-            {/* SITENAME diganti jadi settings.sitename dari database */}
             <p>{settings.sitename} provides lightning-fast video hosting with zero limits on bandwidth. Whether you are sharing funny clips, gameplays, or personal memories, our platform ensures your videos are delivered in the highest quality across all devices globally. Secure, private, and extremely easy to use.</p>
         </article>
 
       </main>
 
-      {/* FOOTER KOMPONEN */}
       <Footer />
     </>
   );
