@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import Header from './components/Header';
+import Footer from './components/Footer';
 
 export default function Home() {
   const [settings, setSettings] = useState({ sitename: 'SITENAME', link_offer: '#' });
