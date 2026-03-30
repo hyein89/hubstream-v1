@@ -1,0 +1,233 @@
+
+        @import url('https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap');
+        :root {
+            --bg-body: #0d1117;
+            --bg-panel: #161b22;
+            --text-main: #c9d1d9;
+            --text-white: #ffffff;
+            --text-muted: #8b949e;
+            --grad-primary: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        }
+
+           * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Jost", sans-serif;
+            font-optical-sizing: auto;
+            font-weight: <weight>;
+            font-style: normal;
+           }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* === 2. HEADER MINIMALIS === */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25px 5%;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-size: clamp(24px, 4vw, 28px);
+            font-weight: 800;
+            color: var(--text-white);
+            letter-spacing: -1px;
+            text-decoration: none;
+        }
+
+        .nav-links a {
+            color: var(--text-white);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 15px;
+            transition: color 0.2s;
+        }
+        
+        .nav-links a:hover { color: #3b82f6; }
+
+        /* === 3. HERO SECTION (AREA UPLOAD) === */
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: clamp(36px, 6vw, 64px);
+            color: var(--text-white);
+            line-height: 1.1;
+            margin-bottom: 20px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            max-width: 800px;
+        }
+
+        .subtitle {
+            font-size: clamp(16px, 3vw, 22px);
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            font-weight: 400;
+        }
+
+        /* Tombol Upload Utama */
+        .btn-upload {
+            background: var(--text-white);
+            color: var(--bg-body);
+            border: none;
+            padding: 16px 40px;
+            border-radius: 50px; /* Bentuk Pil Khas Web Modern */
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,255,255,0.1);
+        }
+
+        /* Input File Asli (Disembunyikan) */
+        #file-input { display: none; }
+
+        /* === 4. ANIMASI PROGRESS BAR (MUNCUL SAAT UPLOAD) === */
+        .upload-process-area {
+            display: none; /* Hilang di awal */
+            width: 100%;
+            max-width: 500px;
+            margin-top: 20px;
+            background: var(--bg-panel);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .progress-title {
+            color: var(--text-white);
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 12px;
+            background-color: var(--bg-body);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--grad-primary);
+            border-radius: 10px;
+            transition: width 0.3s ease-out; /* Animasi mulus saat nambah persen */
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* === 5. HASIL AKHIR (MUNCUL SAAT 100%) === */
+        .result-area {
+            display: none; /* Hilang di awal */
+            width: 100%;
+            max-width: 500px;
+            margin-top: 20px;
+            background: var(--bg-panel);
+            padding: 40px 30px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .result-msg {
+            font-size: 18px;
+            color: var(--text-white);
+            font-weight: 600;
+        }
+
+        .result-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: -10px;
+        }
+
+        .btn-create-account {
+            background: var(--grad-primary);
+            color: white;
+            border: none;
+            padding: 14px 35px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-create-account:hover { opacity: 0.9; }
+
+        /* === 6. ARTIKEL SEO === */
+        .seo-article {
+            width: 100%;
+            max-width: 800px;
+            margin: 60px auto 40px auto;
+            padding: 0 20px;
+            text-align: center;
+        }
+
+        .seo-article h2 {
+            font-size: clamp(20px, 4vw, 24px);
+            color: var(--text-white);
+            margin-bottom: 15px;
+        }
+
+        .seo-article p {
+            font-size: clamp(14px, 3vw, 16px);
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* === 7. FOOTER === */
+        footer {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 40px 20px;
+            font-size: 14px;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+
+        footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        footer a:hover { color: var(--text-white); }
+    
