@@ -11,18 +11,15 @@ export default function HalamanTonton({ params }) {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // State untuk Tab dan Modal
   const [activeTab, setActiveTab] = useState('link');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
-      // Ambil data video
       const { data: vData, error: vErr } = await supabase.from('videos').select('*').eq('id', videoId).single();
       if (vErr || !vData) { setError(true); return; }
       setVideoData(vData);
 
-      // Ambil data setting web
       const { data: sData } = await supabase.from('settings').select('*').eq('id', 1).single();
       setSettings(sData || { domain: 'domain.com', link_offer: '#', ads_native: '' });
       
@@ -31,10 +28,23 @@ export default function HalamanTonton({ params }) {
     fetchData();
   }, [videoId]);
 
+  // TRIK EKSEKUSI SCRIPT IKLAN NATIVE BIAR GAK DIBLOKIR REACT
+  useEffect(() => {
+    const adContainer = document.getElementById('native-ad-container');
+    if (adContainer && settings?.ads_native) {
+      adContainer.innerHTML = ''; // Bersihkan div-nya dulu
+      try {
+        const fragment = document.createRange().createContextualFragment(settings.ads_native);
+        adContainer.appendChild(fragment);
+      } catch (err) {
+        console.error('Gagal render iklan native', err);
+      }
+    }
+  }, [settings?.ads_native, loading]);
+
   if (error) return <div style={{ color: '#fff', background: '#000', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>404 Not Found</div>;
   if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
 
-  // Variabel untuk output TABS URL
   const domainURL = `https://${settings?.domain || 'domain.com'}`;
   const streamUrl = `${domainURL}/${videoId}`;
   const imageUrl = `${domainURL}/${videoId}.jpg`;
@@ -48,7 +58,6 @@ export default function HalamanTonton({ params }) {
     'embed': `<iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen></iframe>`
   };
 
-  // Format Tanggal (Contoh: Apr 20, 2024)
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown Date';
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -56,14 +65,21 @@ export default function HalamanTonton({ params }) {
 
   return (
     <>
-      {/* WAJIB: Pastikan file stream.css lo taro di folder "public" di project Next.js lo */}
       <link rel="stylesheet" href="/stream.css" type="text/css" />
+      
+      {/* PAKSA BACKGROUND JADI GELAP, BUNUH CSS BAWAAN NEXT.JS */}
+      <style jsx global>{`
+        body, html {
+          background-color: #0d1117 !important;
+          margin: 0;
+          padding: 0;
+        }
+      `}</style>
       
       <div className="main-wrapper">
         <h1 className="video-title">{videoData.title}</h1>
 
         <div className="player-container" style={{ background: '#000', position: 'relative', overflow: 'hidden' }}>
-          {/* Murni manggil Iframe Embed. Tombol Play & VAST jalan otomatis dari dalam Iframe */}
           <iframe 
             id="stream-player" 
             src={`/embed/${videoId}`} 
@@ -101,11 +117,13 @@ export default function HalamanTonton({ params }) {
           <textarea id="code-output" className="code-textarea" readOnly value={dataKode[activeTab]} />
         </div>
 
-        {/* AREA IKLAN NATIVE BANNER */}
+        {/* AREA IKLAN NATIVE BANNER DENGAN SCRIPT INJECTOR */}
         <div className="native-ad-area">
           <div className="ad-label">Advertisement</div>
           {settings?.ads_native ? (
-            <div dangerouslySetInnerHTML={{ __html: settings.ads_native }} />
+            <div id="native-ad-container" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+              {/* Script iklan lo bakal disuntik otomatis ke dalam kotak ini */}
+            </div>
           ) : (
             <img src="https://via.placeholder.com/728x90.png?text=Tempat+Native+Ads+Banner" style={{ maxWidth: '100%', height: 'auto', borderRadius: '0' }} alt="Ads" />
           )}
@@ -125,12 +143,11 @@ export default function HalamanTonton({ params }) {
         </div>
       </footer>
 
-      {/* MODAL FLAG VIDEO */}
       {isModalOpen && (
         <div className="modal-overlay" id="flagModal" onClick={(e) => { if(e.target.id === 'flagModal') setIsModalOpen(false) }} style={{ display: 'flex', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 9999, justifyContent: 'center', alignItems: 'center' }}>
           <div className="modal-box" style={{ background: '#161b22', padding: '20px', borderRadius: '0', width: '90%', maxWidth: '400px', border: '1px solid #30363d' }}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0 }}>Report Video</h3>
+              <h3 style={{ margin: 0, color: '#fff' }}>Report Video</h3>
               <button className="close-modal" onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}>✕</button>
             </div>
             <div className="modal-group" style={{ marginBottom: '15px' }}>
