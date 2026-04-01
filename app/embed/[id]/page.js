@@ -42,10 +42,9 @@ export default function EmbedPlayer({ params }) {
       const player = window.videojs(videoNodeRef.current);
       playerRef.current = player;
 
+      // 1. SETUP VAST GOOGLE IMA (STANDAR PABRIK)
       let vastTags = [...(settings.vast_urls || [])];
-      vastTags = vastTags.map(url => {
-        return url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`;
-      });
+      vastTags = vastTags.map(url => url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`);
       vastTags = vastTags.sort(() => Math.random() - 0.5);
 
       if (vastTags.length > 0) {
@@ -55,76 +54,72 @@ export default function EmbedPlayer({ params }) {
             id: videoNodeRef.current.id,
             adTagUrl: vastTags[currentAdIndex],
             vastLoadTimeout: 10000,
-            showCountdown: true,
-            // LOGIKA PENTING: Matikan autoplay content agar tidak balapan suara
-            debug: false
+            showCountdown: true
         });
 
-        // Event saat iklan diminta pause content (video utama harus mati)
-        player.on('contentPauseRequested', () => {
-          player.pause();
+        // Cukup inisialisasi kontainer di klik/play pertama.
+        // Google IMA otomatis meng-handle pause video utama & play iklan.
+        player.on('play', function() {
+            if (player.ima && !player.ima.adDisplayContainerInitialized) {
+                player.ima.initializeAdDisplayContainer();
+            }
         });
 
-        // Event saat iklan selesai (video utama baru boleh jalan)
-        player.on('contentResumeRequested', () => {
-          player.play();
-        });
-
+        // Fallback jika VAST mati/error
         player.on('adserror', function() {
             currentAdIndex++;
             if (currentAdIndex < vastTags.length) {
                 player.ima.changeAdTag(vastTags[currentAdIndex]);
                 player.ima.requestAds();
             } else {
-                player.play(); // Play video utama kalau semua iklan gagal
+                player.play(); // Putar video jika semua VAST gagal
             }
         });
       }
 
-      // --- FIX POPUNDER & ANTI BALAPAN SUARA ---
+      // 2. SETUP POPUNDER (DIPISAH TOTAL DARI LOGIKA IKLAN)
       const linkPopunder = settings.link_offer;
-      const jedaWaktu = 180000; 
+      const jedaWaktu = 180000; // 3 Menit
 
-      const handleUserInteraction = (e) => {
+      const handlePopunder = (e) => {
+        if (!linkPopunder) return; 
+        
+        // Jangan jalankan popunder jika user klik control bar (volume, fullscreen)
         if (e.target.closest('.vjs-control-bar')) return;
+        // Jangan jalankan popunder jika user ngeklik elemen iklan (seperti tombol Skip Ad)
+        if (e.target.closest('.ima-controls-div') || e.target.closest('iframe')) return;
         
         let waktuSekarang = new Date().getTime();
         let waktuTerakhir = localStorage.getItem('catatanPopunderStream');
         
-        // 1. Jalankan Popunder Dulu (Wajib Pertama)
-        if (linkPopunder && (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu))) {
+        if (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu)) {
           window.open(linkPopunder, '_blank');
           localStorage.setItem('catatanPopunderStream', waktuSekarang.toString());
         }
-
-        // 2. Inisialisasi IMA Container
-        if (player.ima && !player.ima.adDisplayContainerInitialized) {
-          player.ima.initializeAdDisplayContainer();
-        }
-
-        // 3. Pastikan Video Utama PAUSE saat iklan mau jalan
-        // Jangan panggil player.play() di sini secara langsung! 
-        // Biarkan plugin IMA yang panggil requestAds.
-        if (player.ima) {
-            player.pause(); // Stop suara balap
-            player.ima.requestAds();
-        } else {
-            player.play();
-        }
       };
 
+      // Terapkan event listener khusus untuk popunder
       const containerVideo = document.getElementById('area-klik');
       if (containerVideo) {
-        containerVideo.addEventListener('mousedown', handleUserInteraction, true);
+        containerVideo.addEventListener('click', handlePopunder, true);
       }
 
       return () => {
         if (containerVideo) {
-          containerVideo.removeEventListener('mousedown', handleUserInteraction, true);
+          containerVideo.removeEventListener('click', handlePopunder, true);
         }
       };
     }
   }, [allScriptsReady, videoData, settings]);
+
+  useEffect(() => {
+      return () => {
+          if (playerRef.current) {
+              playerRef.current.dispose();
+              playerRef.current = null;
+          }
+      };
+  }, []);
 
   if (error) return notFound();
   
@@ -145,11 +140,13 @@ export default function EmbedPlayer({ params }) {
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
         .video-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; background: #000; }
         .video-js { width: 100vw !important; height: 100vh !important; }
-        .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; pointer-events: none; } /* Matikan klik langsung di tombol agar lari ke container */
+        .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; } 
+        video::-internal-media-controls-download-button { display:none; }
+        video::-webkit-media-controls-enclosure { overflow:hidden; }
       `}</style>
 
       {videoData && (
-        <div className="video-container" id="area-klik">
+        <div className="video-container" id="area-klik" onContextMenu={(e) => e.preventDefault()}>
           <div data-vjs-player>
             <video 
               ref={videoNodeRef}
@@ -159,6 +156,7 @@ export default function EmbedPlayer({ params }) {
               preload="auto" 
               playsInline
               poster={`/${videoId}.jpg`}
+              controlsList="nodownload"
             >
               <source src={videoData.video} type="video/mp4" />
             </video>
