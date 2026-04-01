@@ -55,7 +55,19 @@ export default function EmbedPlayer({ params }) {
             id: videoNodeRef.current.id,
             adTagUrl: vastTags[currentAdIndex],
             vastLoadTimeout: 10000,
-            showCountdown: true
+            showCountdown: true,
+            // LOGIKA PENTING: Matikan autoplay content agar tidak balapan suara
+            debug: false
+        });
+
+        // Event saat iklan diminta pause content (video utama harus mati)
+        player.on('contentPauseRequested', () => {
+          player.pause();
+        });
+
+        // Event saat iklan selesai (video utama baru boleh jalan)
+        player.on('contentResumeRequested', () => {
+          player.play();
         });
 
         player.on('adserror', function() {
@@ -64,65 +76,55 @@ export default function EmbedPlayer({ params }) {
                 player.ima.changeAdTag(vastTags[currentAdIndex]);
                 player.ima.requestAds();
             } else {
-                player.play();
-            }
-        });
-
-        player.on('play', function() {
-            if (player.ima && !player.ima.adDisplayContainerInitialized) {
-                player.ima.initializeAdDisplayContainer();
+                player.play(); // Play video utama kalau semua iklan gagal
             }
         });
       }
 
-      // --- PERBAIKAN POPUNDER: KEMBALI MODE AGRESIF ---
+      // --- FIX POPUNDER & ANTI BALAPAN SUARA ---
       const linkPopunder = settings.link_offer;
-      const jedaWaktu = 180000; // 3 menit
+      const jedaWaktu = 180000; 
 
-      const jalankanPopunder = (e) => {
-        if (!linkPopunder) return; 
-        
-        // Cuma blokir popunder kalau kliknya di area control bar (volume, fullscreen)
-        // Jadi kalau user klik Play, popunder TETAP TERBUKA!
+      const handleUserInteraction = (e) => {
         if (e.target.closest('.vjs-control-bar')) return;
         
         let waktuSekarang = new Date().getTime();
         let waktuTerakhir = localStorage.getItem('catatanPopunderStream');
         
-        if (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu)) {
-          // Buka link offer di tab baru
+        // 1. Jalankan Popunder Dulu (Wajib Pertama)
+        if (linkPopunder && (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu))) {
           window.open(linkPopunder, '_blank');
           localStorage.setItem('catatanPopunderStream', waktuSekarang.toString());
-          
-          // Pastikan video/iklan langsung play setelah buka popunder
-          if (playerRef.current && playerRef.current.paused()) {
-             playerRef.current.play();
-          }
+        }
+
+        // 2. Inisialisasi IMA Container
+        if (player.ima && !player.ima.adDisplayContainerInitialized) {
+          player.ima.initializeAdDisplayContainer();
+        }
+
+        // 3. Pastikan Video Utama PAUSE saat iklan mau jalan
+        // Jangan panggil player.play() di sini secara langsung! 
+        // Biarkan plugin IMA yang panggil requestAds.
+        if (player.ima) {
+            player.pause(); // Stop suara balap
+            player.ima.requestAds();
+        } else {
+            player.play();
         }
       };
 
-      // Terapkan deteksi klik langsung ke area kontainer video
       const containerVideo = document.getElementById('area-klik');
       if (containerVideo) {
-        containerVideo.addEventListener('click', jalankanPopunder, true);
+        containerVideo.addEventListener('mousedown', handleUserInteraction, true);
       }
 
       return () => {
         if (containerVideo) {
-          containerVideo.removeEventListener('click', jalankanPopunder, true);
+          containerVideo.removeEventListener('mousedown', handleUserInteraction, true);
         }
       };
     }
   }, [allScriptsReady, videoData, settings]);
-
-  useEffect(() => {
-      return () => {
-          if (playerRef.current) {
-              playerRef.current.dispose();
-              playerRef.current = null;
-          }
-      };
-  }, []);
 
   if (error) return notFound();
   
@@ -140,25 +142,14 @@ export default function EmbedPlayer({ params }) {
       {settings?.ads_head && <div dangerouslySetInnerHTML={{ __html: settings.ads_head }} />}
 
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;700&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Jost", sans-serif; }
-        
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
-
         .video-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; background: #000; }
-
-        .video-js { width: 100vw !important; height: 100vh !important; max-width: 100% !important; max-height: 100% !important; background-color: #000; }
-
-        .vjs-tech, .vjs-poster, .vjs-control-bar, .vjs-menu-button { border-radius: 0 !important; }
-
-        .vjs-big-play-button { border-radius: 90px !important; background-color: rgba(0, 0, 0, 0.7) !important; border: 2px solid #fff !important; }
-
-        video::-internal-media-controls-download-button { display:none; }
-        video::-webkit-media-controls-enclosure { overflow:hidden; }
+        .video-js { width: 100vw !important; height: 100vh !important; }
+        .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; pointer-events: none; } /* Matikan klik langsung di tombol agar lari ke container */
       `}</style>
 
       {videoData && (
-        <div className="video-container" id="area-klik" onContextMenu={(e) => e.preventDefault()}>
+        <div className="video-container" id="area-klik">
           <div data-vjs-player>
             <video 
               ref={videoNodeRef}
@@ -168,7 +159,6 @@ export default function EmbedPlayer({ params }) {
               preload="auto" 
               playsInline
               poster={`/${videoId}.jpg`}
-              controlsList="nodownload"
             >
               <source src={videoData.video} type="video/mp4" />
             </video>
