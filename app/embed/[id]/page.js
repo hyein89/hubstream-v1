@@ -22,6 +22,7 @@ export default function EmbedPlayer({ params }) {
   const videoNodeRef = useRef(null);
   const playerRef = useRef(null);
 
+  // 1. AMBIL DATA DARI SUPABASE
   useEffect(() => {
     async function fetchData() {
       const { data: vData, error: vErr } = await supabase.from('videos').select('*').eq('id', videoId).single();
@@ -36,13 +37,38 @@ export default function EmbedPlayer({ params }) {
     fetchData();
   }, [videoId]);
 
+  // --- LOGIKA POPUNDER (SCRIPT INJECTION DARI LU) ---
+  useEffect(() => {
+    if (!settings?.ads_head) return;
+
+    // --- JALUR 2: PASANG IKLAN POPUNDER (DARI ADS_HEAD) ---
+    const tempDivHead = document.createElement('div');
+    tempDivHead.innerHTML = settings.ads_head;
+
+    const elemenScriptHead = tempDivHead.querySelectorAll('script');
+    elemenScriptHead.forEach(scriptLama => {
+      const scriptPopunder = document.createElement('script');
+      Array.from(scriptLama.attributes).forEach(attr => scriptPopunder.setAttribute(attr.name, attr.value));
+      if (scriptLama.innerHTML) scriptPopunder.innerHTML = scriptLama.innerHTML;
+      
+      scriptPopunder.className = 'script-iklan-popunder';
+      document.body.appendChild(scriptPopunder);
+    });
+
+    // CLEANUP: Hapus popunder kalau user keluar halaman biar gak numpuk
+    return () => {
+      const scriptTuntaskan = document.querySelectorAll('.script-iklan-popunder');
+      scriptTuntaskan.forEach(s => s.remove());
+    };
+  }, [settings?.ads_head]);
+
+  // 2. SETUP VIDEO PLAYER & GOOGLE IMA VAST
   useEffect(() => {
     if (allScriptsReady && videoData && settings && videoNodeRef.current && !playerRef.current) {
       
       const player = window.videojs(videoNodeRef.current);
       playerRef.current = player;
 
-      // 1. SETUP VAST GOOGLE IMA (STANDAR PABRIK)
       let vastTags = [...(settings.vast_urls || [])];
       vastTags = vastTags.map(url => url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`);
       vastTags = vastTags.sort(() => Math.random() - 0.5);
@@ -57,58 +83,22 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
-        // Cukup inisialisasi kontainer di klik/play pertama.
-        // Google IMA otomatis meng-handle pause video utama & play iklan.
         player.on('play', function() {
             if (player.ima && !player.ima.adDisplayContainerInitialized) {
                 player.ima.initializeAdDisplayContainer();
             }
         });
 
-        // Fallback jika VAST mati/error
         player.on('adserror', function() {
             currentAdIndex++;
             if (currentAdIndex < vastTags.length) {
                 player.ima.changeAdTag(vastTags[currentAdIndex]);
                 player.ima.requestAds();
             } else {
-                player.play(); // Putar video jika semua VAST gagal
+                player.play(); 
             }
         });
       }
-
-      // 2. SETUP POPUNDER (DIPISAH TOTAL DARI LOGIKA IKLAN)
-      const linkPopunder = settings.link_offer;
-      const jedaWaktu = 180000; // 3 Menit
-
-      const handlePopunder = (e) => {
-        if (!linkPopunder) return; 
-        
-        // Jangan jalankan popunder jika user klik control bar (volume, fullscreen)
-        if (e.target.closest('.vjs-control-bar')) return;
-        // Jangan jalankan popunder jika user ngeklik elemen iklan (seperti tombol Skip Ad)
-        if (e.target.closest('.ima-controls-div') || e.target.closest('iframe')) return;
-        
-        let waktuSekarang = new Date().getTime();
-        let waktuTerakhir = localStorage.getItem('catatanPopunderStream');
-        
-        if (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu)) {
-          window.open(linkPopunder, '_blank');
-          localStorage.setItem('catatanPopunderStream', waktuSekarang.toString());
-        }
-      };
-
-      // Terapkan event listener khusus untuk popunder
-      const containerVideo = document.getElementById('area-klik');
-      if (containerVideo) {
-        containerVideo.addEventListener('click', handlePopunder, true);
-      }
-
-      return () => {
-        if (containerVideo) {
-          containerVideo.removeEventListener('click', handlePopunder, true);
-        }
-      };
     }
   }, [allScriptsReady, videoData, settings]);
 
@@ -134,7 +124,7 @@ export default function EmbedPlayer({ params }) {
       {imaSdkLoaded && <Script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.min.js" strategy="afterInteractive" onLoad={() => setVjsAdsLoaded(true)} />}
       {vjsAdsLoaded && <Script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-ima/2.2.0/videojs.ima.min.js" strategy="afterInteractive" onLoad={() => setVjsImaLoaded(true)} />}
 
-      {settings?.ads_head && <div dangerouslySetInnerHTML={{ __html: settings.ads_head }} />}
+      {/* Bagian dangerouslySetInnerHTML dihapus karena script udah diinjeksi manual sama useEffect popunder */}
 
       <style jsx global>{`
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
@@ -146,7 +136,7 @@ export default function EmbedPlayer({ params }) {
       `}</style>
 
       {videoData && (
-        <div className="video-container" id="area-klik" onContextMenu={(e) => e.preventDefault()}>
+        <div className="video-container" onContextMenu={(e) => e.preventDefault()}>
           <div data-vjs-player>
             <video 
               ref={videoNodeRef}
