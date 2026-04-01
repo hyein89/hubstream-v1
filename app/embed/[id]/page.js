@@ -12,7 +12,6 @@ export default function EmbedPlayer({ params }) {
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState(false);
   
-  // State untuk memastikan script diload berurutan (Sangat penting agar IMA tidak error di Next.js)
   const [vjsLoaded, setVjsLoaded] = useState(false);
   const [imaSdkLoaded, setImaSdkLoaded] = useState(false);
   const [vjsAdsLoaded, setVjsAdsLoaded] = useState(false);
@@ -23,7 +22,6 @@ export default function EmbedPlayer({ params }) {
   const videoNodeRef = useRef(null);
   const playerRef = useRef(null);
 
-  // 1. Ambil Data dari Supabase (Tetap persis seperti kode asli lu)
   useEffect(() => {
     async function fetchData() {
       const { data: vData, error: vErr } = await supabase.from('videos').select('*').eq('id', videoId).single();
@@ -38,15 +36,12 @@ export default function EmbedPlayer({ params }) {
     fetchData();
   }, [videoId]);
 
-  // 2. Inisialisasi Player & VAST (Hanya jalan setelah semua data & script siap)
   useEffect(() => {
     if (allScriptsReady && videoData && settings && videoNodeRef.current && !playerRef.current) {
       
-      // Inisialisasi VideoJS
       const player = window.videojs(videoNodeRef.current);
       playerRef.current = player;
 
-      // Logika VAST Acak & Anti-Cache bawaan lu
       let vastTags = [...(settings.vast_urls || [])];
       vastTags = vastTags.map(url => {
         return url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`;
@@ -63,7 +58,6 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
-        // Fallback VAST
         player.on('adserror', function() {
             currentAdIndex++;
             if (currentAdIndex < vastTags.length) {
@@ -81,33 +75,46 @@ export default function EmbedPlayer({ params }) {
         });
       }
 
-      // 3. Logika Popunder (Disempurnakan biar kontrol video bisa diklik tanpa ngetrigger popunder)
+      // --- PERBAIKAN POPUNDER: KEMBALI MODE AGRESIF ---
       const linkPopunder = settings.link_offer;
-      const jedaWaktu = 180000; 
+      const jedaWaktu = 180000; // 3 menit
 
       const jalankanPopunder = (e) => {
         if (!linkPopunder) return; 
         
-        // Jangan jalankan popunder jika user klik tombol play, volume, atau bar durasi
-        if (e.target.closest('.vjs-control-bar') || e.target.closest('.vjs-big-play-button')) return;
+        // Cuma blokir popunder kalau kliknya di area control bar (volume, fullscreen)
+        // Jadi kalau user klik Play, popunder TETAP TERBUKA!
+        if (e.target.closest('.vjs-control-bar')) return;
         
         let waktuSekarang = new Date().getTime();
         let waktuTerakhir = localStorage.getItem('catatanPopunderStream');
+        
         if (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu)) {
+          // Buka link offer di tab baru
           window.open(linkPopunder, '_blank');
           localStorage.setItem('catatanPopunderStream', waktuSekarang.toString());
+          
+          // Pastikan video/iklan langsung play setelah buka popunder
+          if (playerRef.current && playerRef.current.paused()) {
+             playerRef.current.play();
+          }
         }
       };
 
-      document.addEventListener('click', jalankanPopunder, true);
+      // Terapkan deteksi klik langsung ke area kontainer video
+      const containerVideo = document.getElementById('area-klik');
+      if (containerVideo) {
+        containerVideo.addEventListener('click', jalankanPopunder, true);
+      }
 
       return () => {
-        document.removeEventListener('click', jalankanPopunder, true);
+        if (containerVideo) {
+          containerVideo.removeEventListener('click', jalankanPopunder, true);
+        }
       };
     }
   }, [allScriptsReady, videoData, settings]);
 
-  // Cleanup untuk Next.js agar tidak bocor memory saat pindah halaman
   useEffect(() => {
       return () => {
           if (playerRef.current) {
@@ -121,12 +128,10 @@ export default function EmbedPlayer({ params }) {
   
   return (
     <>
-      {/* CSS Wajib Video.js & Google IMA */}
       <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
       <link href="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.css" rel="stylesheet" />
       <link href="https://cdnjs.cloudflare.com/ajax/libs/videojs-ima/2.2.0/videojs.ima.css" rel="stylesheet" />
 
-      {/* Script Diload Berurutan dengan System State React */}
       <Script src="https://vjs.zencdn.net/8.10.0/video.min.js" strategy="afterInteractive" onLoad={() => setVjsLoaded(true)} />
       {vjsLoaded && <Script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js" strategy="afterInteractive" onLoad={() => setImaSdkLoaded(true)} />}
       {imaSdkLoaded && <Script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.min.js" strategy="afterInteractive" onLoad={() => setVjsAdsLoaded(true)} />}
@@ -138,46 +143,15 @@ export default function EmbedPlayer({ params }) {
         @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Jost", sans-serif; }
         
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            overflow: hidden;
-        }
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
 
-        .video-container {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #000;
-        }
+        .video-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; background: #000; }
 
-        /* Setup Video.js untuk mengisi penuh container */
-        .video-js {
-            width: 100vw !important;
-            height: 100vh !important;
-            max-width: 100% !important;
-            max-height: 100% !important;
-            background-color: #000;
-        }
+        .video-js { width: 100vw !important; height: 100vh !important; max-width: 100% !important; max-height: 100% !important; background-color: #000; }
 
-        /* Hapus lengkungan, kecuali untuk tombol play bulat yang lu mau */
-        .vjs-tech, .vjs-poster, .vjs-control-bar, .vjs-menu-button {
-            border-radius: 0 !important;
-        }
+        .vjs-tech, .vjs-poster, .vjs-control-bar, .vjs-menu-button { border-radius: 0 !important; }
 
-        .vjs-big-play-button {
-            border-radius: 90px !important;
-            background-color: rgba(0, 0, 0, 0.7) !important;
-            border: 2px solid #fff !important;
-        }
+        .vjs-big-play-button { border-radius: 90px !important; background-color: rgba(0, 0, 0, 0.7) !important; border: 2px solid #fff !important; }
 
         video::-internal-media-controls-download-button { display:none; }
         video::-webkit-media-controls-enclosure { overflow:hidden; }
