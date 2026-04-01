@@ -107,8 +107,7 @@ export default function HalamanTonton({ params }) {
   return (
     <>
       <link rel="stylesheet" href="/stream.css" precedence="default" />
-      {settings?.ads_head && <div dangerouslySetInnerHTML={{ __html: settings.ads_head }} />}
-      <style jsx global>{`
+       <style jsx global>{`
         body, html {
           background-color: #0d1117 !important;
           margin: 0;
