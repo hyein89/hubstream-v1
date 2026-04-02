@@ -42,7 +42,6 @@ export default function EmbedPlayer({ params }) {
       const player = window.videojs(videoNodeRef.current);
       playerRef.current = player;
 
-      // --- 1. SETUP VAST GOOGLE IMA ---
       let vastTags = [...(settings.vast_urls || [])];
       vastTags = vastTags.map(url => url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`);
       vastTags = vastTags.sort(() => Math.random() - 0.5);
@@ -57,13 +56,7 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
-        // Cukup inisialisasi di play pertama. Google IMA akan urus sisanya otomatis.
-        player.on('play', function() {
-            if (player.ima && !player.ima.adDisplayContainerInitialized) {
-                player.ima.initializeAdDisplayContainer();
-            }
-        });
-
+        // FALLBACK ADS ERROR
         player.on('adserror', function() {
             currentAdIndex++;
             if (currentAdIndex < vastTags.length) {
@@ -75,38 +68,41 @@ export default function EmbedPlayer({ params }) {
         });
       }
 
-      // --- 2. LOGIKA LINK OFFER (ANTI-LOOPING) ---
-      const linkOffer = settings.link_offer;
-      const jedaWaktu = 180000; // 3 Menit
+      // --- LOGIKA UTAMA: LINK OFFER & PLAY (ANTI KEDIP) ---
+      const handleGlobalClick = (e) => {
+        // Jangan eksekusi kalau klik di control bar atau tombol skip
+        if (e.target.closest('.vjs-control-bar') || e.target.closest('.ima-controls-div')) return;
 
-      const eksekusiKlik = (e) => {
-        // PENTING: Jangan eksekusi apapun kalau user klik di area Control Bar atau di dalam Iklan (Iframe / Skip Button)
-        if (e.target.closest('.vjs-control-bar') || e.target.closest('.ima-controls-div') || e.target.tagName.toLowerCase() === 'iframe') {
-            return;
-        }
-        
+        const linkOffer = settings.link_offer;
+        const jedaWaktu = 180000; // 3 Menit
         let waktuSekarang = new Date().getTime();
         let waktuTerakhir = localStorage.getItem('catatanLinkOfferVidly');
-        
-        // JALANKAN LINK OFFER (TAB BARU)
+
+        // 1. LINK OFFER (WAJIB PERTAMA)
         if (linkOffer && (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu))) {
           window.open(linkOffer, '_blank');
           localStorage.setItem('catatanLinkOfferVidly', waktuSekarang.toString());
         }
 
-        // Cukup pancing tombol play. Gak perlu requestAds manual yang bikin looping!
+        // 2. INITIALIZE IMA (BIAR IKLAN JALAN)
+        if (player.ima && !player.ima.adDisplayContainerInitialized) {
+          player.ima.initializeAdDisplayContainer();
+        }
+
+        // 3. MULAI VIDEO/IKLAN
         if (player.paused()) {
-            player.play();
+          player.play();
         }
       };
 
-      const areaEmbed = document.getElementById('area-klik-utama');
-      if (areaEmbed) {
-        areaEmbed.addEventListener('mousedown', eksekusiKlik, true);
+      // Kita pasang event listener di container paling luar sekali saja
+      const mainBox = document.getElementById('main-player-box');
+      if (mainBox) {
+        mainBox.addEventListener('click', handleGlobalClick, true);
       }
 
       return () => {
-        if (areaEmbed) areaEmbed.removeEventListener('mousedown', eksekusiKlik, true);
+        if (mainBox) mainBox.removeEventListener('click', handleGlobalClick, true);
       };
     }
   }, [allScriptsReady, videoData, settings]);
@@ -130,20 +126,44 @@ export default function EmbedPlayer({ params }) {
 
       <style jsx global>{`
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
-        .video-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; background: #000; }
-        .video-js { width: 100vw !important; height: 100vh !important; }
-        .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; pointer-events: none; } 
+        
+        /* Container utama: Tanpa flex yang aneh-aneh biar gak kedip */
+        .video-box { 
+          width: 100vw; 
+          height: 100vh; 
+          background: #000; 
+          position: relative;
+        }
+
+        .video-js { 
+          width: 100% !important; 
+          height: 100% !important; 
+        }
+
+        /* Tombol Play Gede */
+        .vjs-big-play-button { 
+          border-radius: 90px !important; 
+          border: 2px solid #fff !important; 
+          background-color: rgba(0,0,0,0.5) !important;
+          z-index: 2;
+        } 
+
+        /* Biar Iklan IMA gak ketutup */
+        .vjs-ad-container {
+          z-index: 10 !important;
+        }
+
         video::-internal-media-controls-download-button { display:none; }
         video::-webkit-media-controls-enclosure { overflow:hidden; }
       `}</style>
 
       {videoData && (
-        <div className="video-container" id="area-klik-utama" onContextMenu={(e) => e.preventDefault()}>
-          <div data-vjs-player>
+        <div className="video-box" id="main-player-box" onContextMenu={(e) => e.preventDefault()}>
+          <div data-vjs-player style={{ width: '100%', height: '100%' }}>
             <video 
               ref={videoNodeRef}
               id={`vidly-player-${videoId}`}
-              className="video-js vjs-default-skin vjs-big-play-centered vjs-fill" 
+              className="video-js vjs-default-skin vjs-big-play-centered" 
               controls 
               preload="auto" 
               playsInline
