@@ -42,6 +42,7 @@ export default function EmbedPlayer({ params }) {
       const player = window.videojs(videoNodeRef.current);
       playerRef.current = player;
 
+      // --- SETUP VAST GOOGLE IMA ---
       let vastTags = [...(settings.vast_urls || [])];
       vastTags = vastTags.map(url => url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`);
       vastTags = vastTags.sort(() => Math.random() - 0.5);
@@ -56,7 +57,10 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
-        // FALLBACK ADS ERROR
+        // Anti Suara Balap
+        player.on('contentPauseRequested', () => { player.pause(); });
+        player.on('contentResumeRequested', () => { player.play(); });
+
         player.on('adserror', function() {
             currentAdIndex++;
             if (currentAdIndex < vastTags.length) {
@@ -68,41 +72,40 @@ export default function EmbedPlayer({ params }) {
         });
       }
 
-      // --- LOGIKA UTAMA: LINK OFFER & PLAY (ANTI KEDIP) ---
-      const handleGlobalClick = (e) => {
-        // Jangan eksekusi kalau klik di control bar atau tombol skip
-        if (e.target.closest('.vjs-control-bar') || e.target.closest('.ima-controls-div')) return;
-
+      // --- LOGIKA LINK OFFER (TRIK LAPISAN SEKALI PAKAI) ---
+      const overlayKaca = document.getElementById('kaca-link-offer');
+      
+      const handleKlikPertama = () => {
         const linkOffer = settings.link_offer;
         const jedaWaktu = 180000; // 3 Menit
         let waktuSekarang = new Date().getTime();
         let waktuTerakhir = localStorage.getItem('catatanLinkOfferVidly');
 
-        // 1. LINK OFFER (WAJIB PERTAMA)
+        // 1. Eksekusi Link Offer (100% tembus karena direct click di HTML mentah)
         if (linkOffer && (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu))) {
           window.open(linkOffer, '_blank');
           localStorage.setItem('catatanLinkOfferVidly', waktuSekarang.toString());
         }
 
-        // 2. INITIALIZE IMA (BIAR IKLAN JALAN)
+        // 2. Hancurkan Kaca Transparan (Mencegah kedip hitam & ngasih jalan buat Iklan VAST)
+        if (overlayKaca) {
+            overlayKaca.style.display = 'none';
+        }
+
+        // 3. Pancing sistem Google IMA dan putar video
         if (player.ima && !player.ima.adDisplayContainerInitialized) {
           player.ima.initializeAdDisplayContainer();
         }
-
-        // 3. MULAI VIDEO/IKLAN
-        if (player.paused()) {
-          player.play();
-        }
+        player.play();
       };
 
-      // Kita pasang event listener di container paling luar sekali saja
-      const mainBox = document.getElementById('main-player-box');
-      if (mainBox) {
-        mainBox.addEventListener('click', handleGlobalClick, true);
+      if (overlayKaca) {
+        // Pake 'click' murni di elemen paling atas
+        overlayKaca.addEventListener('click', handleKlikPertama);
       }
 
       return () => {
-        if (mainBox) mainBox.removeEventListener('click', handleGlobalClick, true);
+        if (overlayKaca) overlayKaca.removeEventListener('click', handleKlikPertama);
       };
     }
   }, [allScriptsReady, videoData, settings]);
@@ -126,39 +129,22 @@ export default function EmbedPlayer({ params }) {
 
       <style jsx global>{`
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
-        
-        /* Container utama: Tanpa flex yang aneh-aneh biar gak kedip */
-        .video-box { 
-          width: 100vw; 
-          height: 100vh; 
-          background: #000; 
-          position: relative;
-        }
-
-        .video-js { 
-          width: 100% !important; 
-          height: 100% !important; 
-        }
-
-        /* Tombol Play Gede */
-        .vjs-big-play-button { 
-          border-radius: 90px !important; 
-          border: 2px solid #fff !important; 
-          background-color: rgba(0,0,0,0.5) !important;
-          z-index: 2;
-        } 
-
-        /* Biar Iklan IMA gak ketutup */
-        .vjs-ad-container {
-          z-index: 10 !important;
-        }
-
+        .video-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; background: #000; }
+        .video-js { width: 100vw !important; height: 100vh !important; }
+        .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; pointer-events: none; } 
         video::-internal-media-controls-download-button { display:none; }
         video::-webkit-media-controls-enclosure { overflow:hidden; }
       `}</style>
 
       {videoData && (
-        <div className="video-box" id="main-player-box" onContextMenu={(e) => e.preventDefault()}>
+        <div className="video-container" onContextMenu={(e) => e.preventDefault()}>
+          
+          {/* INI KUNCI RAHASIANYA: Lapisan Kaca yang nangkep Link Offer terus hancur */}
+          <div id="kaca-link-offer" style={{
+            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+            zIndex: 9999, cursor: 'pointer', backgroundColor: 'transparent'
+          }}></div>
+
           <div data-vjs-player style={{ width: '100%', height: '100%' }}>
             <video 
               ref={videoNodeRef}
