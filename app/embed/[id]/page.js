@@ -22,7 +22,7 @@ export default function EmbedPlayer({ params }) {
   const videoNodeRef = useRef(null);
   const playerRef = useRef(null);
 
-  // 1. AMBIL DATA DARI SUPABASE
+  // 1. AMBIL DATA (Hanya butuh link_offer & vast_urls)
   useEffect(() => {
     async function fetchData() {
       const { data: vData, error: vErr } = await supabase.from('videos').select('*').eq('id', videoId).single();
@@ -30,39 +30,14 @@ export default function EmbedPlayer({ params }) {
       setVideoData(vData);
 
       const { data: sData } = await supabase.from('settings').select('*').eq('id', 1).single();
-      setSettings(sData || { ads_head: '', link_offer: '', vast_urls: [] });
+      setSettings(sData || { link_offer: '', vast_urls: [] });
 
       await supabase.rpc('increment_hitcount', { video_id: videoId });
     }
     fetchData();
   }, [videoId]);
 
-  // --- LOGIKA POPUNDER (SCRIPT INJECTION DARI LU) ---
-  useEffect(() => {
-    if (!settings?.ads_head) return;
-
-    // --- JALUR 2: PASANG IKLAN POPUNDER (DARI ADS_HEAD) ---
-    const tempDivHead = document.createElement('div');
-    tempDivHead.innerHTML = settings.ads_head;
-
-    const elemenScriptHead = tempDivHead.querySelectorAll('script');
-    elemenScriptHead.forEach(scriptLama => {
-      const scriptPopunder = document.createElement('script');
-      Array.from(scriptLama.attributes).forEach(attr => scriptPopunder.setAttribute(attr.name, attr.value));
-      if (scriptLama.innerHTML) scriptPopunder.innerHTML = scriptLama.innerHTML;
-      
-      scriptPopunder.className = 'script-iklan-popunder';
-      document.body.appendChild(scriptPopunder);
-    });
-
-    // CLEANUP: Hapus popunder kalau user keluar halaman biar gak numpuk
-    return () => {
-      const scriptTuntaskan = document.querySelectorAll('.script-iklan-popunder');
-      scriptTuntaskan.forEach(s => s.remove());
-    };
-  }, [settings?.ads_head]);
-
-  // 2. SETUP VIDEO PLAYER & GOOGLE IMA VAST
+  // 2. SETUP PLAYER & GOOGLE IMA
   useEffect(() => {
     if (allScriptsReady && videoData && settings && videoNodeRef.current && !playerRef.current) {
       
@@ -83,11 +58,9 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
-        player.on('play', function() {
-            if (player.ima && !player.ima.adDisplayContainerInitialized) {
-                player.ima.initializeAdDisplayContainer();
-            }
-        });
+        // Anti suara balap: Iklan minta pause, video utama harus nurut
+        player.on('contentPauseRequested', () => { player.pause(); });
+        player.on('contentResumeRequested', () => { player.play(); });
 
         player.on('adserror', function() {
             currentAdIndex++;
@@ -99,16 +72,52 @@ export default function EmbedPlayer({ params }) {
             }
         });
       }
+
+      // --- LOGIKA LINK OFFER (SEPERTI SEMULA) ---
+      const linkOffer = settings.link_offer;
+      const jedaWaktu = 180000; // 3 Menit
+
+      const eksekusiKlik = (e) => {
+        // Jangan lari ke link offer kalau cuma klik tombol mute/fullscreen
+        if (e.target.closest('.vjs-control-bar')) return;
+        
+        let waktuSekarang = new Date().getTime();
+        let waktuTerakhir = localStorage.getItem('catatanLinkOfferVidly');
+        
+        // JALANKAN LINK OFFER (TAB BARU)
+        if (linkOffer && (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu))) {
+          window.open(linkOffer, '_blank');
+          localStorage.setItem('catatanLinkOfferVidly', waktuSekarang.toString());
+        }
+
+        // START IKLAN & VIDEO
+        if (player.ima && !player.ima.adDisplayContainerInitialized) {
+            player.ima.initializeAdDisplayContainer();
+        }
+        
+        // Mencegah suara balapan: pause dulu baru request iklan
+        player.pause();
+        if (player.ima) {
+            player.ima.requestAds();
+        } else {
+            player.play();
+        }
+      };
+
+      const areaEmbed = document.getElementById('area-klik-utama');
+      if (areaEmbed) {
+        // Pake 'mousedown' biar lebih responsif nembus blokir browser
+        areaEmbed.addEventListener('mousedown', eksekusiKlik, true);
+      }
+
+      return () => {
+        if (areaEmbed) areaEmbed.removeEventListener('mousedown', eksekusiKlik, true);
+      };
     }
   }, [allScriptsReady, videoData, settings]);
 
   useEffect(() => {
-      return () => {
-          if (playerRef.current) {
-              playerRef.current.dispose();
-              playerRef.current = null;
-          }
-      };
+      return () => { if (playerRef.current) { playerRef.current.dispose(); playerRef.current = null; } };
   }, []);
 
   if (error) return notFound();
@@ -124,19 +133,18 @@ export default function EmbedPlayer({ params }) {
       {imaSdkLoaded && <Script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.min.js" strategy="afterInteractive" onLoad={() => setVjsAdsLoaded(true)} />}
       {vjsAdsLoaded && <Script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-ima/2.2.0/videojs.ima.min.js" strategy="afterInteractive" onLoad={() => setVjsImaLoaded(true)} />}
 
-      {/* Bagian dangerouslySetInnerHTML dihapus karena script udah diinjeksi manual sama useEffect popunder */}
-
       <style jsx global>{`
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
         .video-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; background: #000; }
         .video-js { width: 100vw !important; height: 100vh !important; }
-        .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; } 
+        /* Tombol Play Gede Bulat */
+        .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; pointer-events: none; } 
         video::-internal-media-controls-download-button { display:none; }
         video::-webkit-media-controls-enclosure { overflow:hidden; }
       `}</style>
 
       {videoData && (
-        <div className="video-container" onContextMenu={(e) => e.preventDefault()}>
+        <div className="video-container" id="area-klik-utama" onContextMenu={(e) => e.preventDefault()}>
           <div data-vjs-player>
             <video 
               ref={videoNodeRef}
