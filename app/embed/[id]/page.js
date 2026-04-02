@@ -22,7 +22,6 @@ export default function EmbedPlayer({ params }) {
   const videoNodeRef = useRef(null);
   const playerRef = useRef(null);
 
-  // 1. AMBIL DATA (Hanya butuh link_offer & vast_urls)
   useEffect(() => {
     async function fetchData() {
       const { data: vData, error: vErr } = await supabase.from('videos').select('*').eq('id', videoId).single();
@@ -37,13 +36,13 @@ export default function EmbedPlayer({ params }) {
     fetchData();
   }, [videoId]);
 
-  // 2. SETUP PLAYER & GOOGLE IMA
   useEffect(() => {
     if (allScriptsReady && videoData && settings && videoNodeRef.current && !playerRef.current) {
       
       const player = window.videojs(videoNodeRef.current);
       playerRef.current = player;
 
+      // --- 1. SETUP VAST GOOGLE IMA ---
       let vastTags = [...(settings.vast_urls || [])];
       vastTags = vastTags.map(url => url.includes('?') ? `${url}&cb=${Date.now()}` : `${url}?cb=${Date.now()}`);
       vastTags = vastTags.sort(() => Math.random() - 0.5);
@@ -58,9 +57,12 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
-        // Anti suara balap: Iklan minta pause, video utama harus nurut
-        player.on('contentPauseRequested', () => { player.pause(); });
-        player.on('contentResumeRequested', () => { player.play(); });
+        // Cukup inisialisasi di play pertama. Google IMA akan urus sisanya otomatis.
+        player.on('play', function() {
+            if (player.ima && !player.ima.adDisplayContainerInitialized) {
+                player.ima.initializeAdDisplayContainer();
+            }
+        });
 
         player.on('adserror', function() {
             currentAdIndex++;
@@ -73,13 +75,15 @@ export default function EmbedPlayer({ params }) {
         });
       }
 
-      // --- LOGIKA LINK OFFER (SEPERTI SEMULA) ---
+      // --- 2. LOGIKA LINK OFFER (ANTI-LOOPING) ---
       const linkOffer = settings.link_offer;
       const jedaWaktu = 180000; // 3 Menit
 
       const eksekusiKlik = (e) => {
-        // Jangan lari ke link offer kalau cuma klik tombol mute/fullscreen
-        if (e.target.closest('.vjs-control-bar')) return;
+        // PENTING: Jangan eksekusi apapun kalau user klik di area Control Bar atau di dalam Iklan (Iframe / Skip Button)
+        if (e.target.closest('.vjs-control-bar') || e.target.closest('.ima-controls-div') || e.target.tagName.toLowerCase() === 'iframe') {
+            return;
+        }
         
         let waktuSekarang = new Date().getTime();
         let waktuTerakhir = localStorage.getItem('catatanLinkOfferVidly');
@@ -90,23 +94,14 @@ export default function EmbedPlayer({ params }) {
           localStorage.setItem('catatanLinkOfferVidly', waktuSekarang.toString());
         }
 
-        // START IKLAN & VIDEO
-        if (player.ima && !player.ima.adDisplayContainerInitialized) {
-            player.ima.initializeAdDisplayContainer();
-        }
-        
-        // Mencegah suara balapan: pause dulu baru request iklan
-        player.pause();
-        if (player.ima) {
-            player.ima.requestAds();
-        } else {
+        // Cukup pancing tombol play. Gak perlu requestAds manual yang bikin looping!
+        if (player.paused()) {
             player.play();
         }
       };
 
       const areaEmbed = document.getElementById('area-klik-utama');
       if (areaEmbed) {
-        // Pake 'mousedown' biar lebih responsif nembus blokir browser
         areaEmbed.addEventListener('mousedown', eksekusiKlik, true);
       }
 
@@ -137,7 +132,6 @@ export default function EmbedPlayer({ params }) {
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; overflow: hidden; }
         .video-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; justify-content: center; align-items: center; background: #000; }
         .video-js { width: 100vw !important; height: 100vh !important; }
-        /* Tombol Play Gede Bulat */
         .vjs-big-play-button { border-radius: 90px !important; border: 2px solid #fff !important; pointer-events: none; } 
         video::-internal-media-controls-download-button { display:none; }
         video::-webkit-media-controls-enclosure { overflow:hidden; }
