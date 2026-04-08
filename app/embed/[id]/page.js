@@ -28,7 +28,6 @@ export default function EmbedPlayer({ params }) {
       if (vErr || !vData) { setError(true); return; }
       setVideoData(vData);
 
-      // link_offer udah gak kepake, tapi dibiarin aja takut datanya dibutuhin di tempat lain
       const { data: sData } = await supabase.from('settings').select('*').eq('id', 1).single();
       setSettings(sData || { link_offer: '', vast_urls: [] });
 
@@ -58,7 +57,6 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
-        // Anti Suara Balap
         player.on('contentPauseRequested', () => { player.pause(); });
         player.on('contentResumeRequested', () => { player.play(); });
 
@@ -73,31 +71,38 @@ export default function EmbedPlayer({ params }) {
         });
       }
 
-      // --- LOGIKA MONETAG REWARDED INTERSTITIAL ---
+      // --- LOGIKA MONETAG (PELACAK OTOMATIS) ---
       const overlayKaca = document.getElementById('kaca-link-offer');
       
       const handleKlikPertama = () => {
         
-        // 1. Panggil Iklan Monetag (Cek dulu biar gak error kalau script belum ngeload)
+        // 1. Panggil Iklan Monetag dengan Pelacak Iframe
         try {
+          // Cek apakah script ada di halaman embed ini
           if (typeof window.show_10806273 === 'function') {
             window.show_10806273().then(() => {
-              // Fungsi ini dieksekusi setelah penonton selesai lihat iklan Monetag
-              console.log('Iklan Monetag Selesai');
-              // Opsional: Pastikan video kembali terputar
               if (player.paused()) player.play();
-            }).catch(e => console.log('Monetag skip/error:', e));
+            });
+          } 
+          // Cek apakah script ada di halaman utama (kalau dipasang via Iframe)
+          else if (window.parent && typeof window.parent.show_10806273 === 'function') {
+            window.parent.show_10806273().then(() => {
+              if (player.paused()) player.play();
+            });
+          } 
+          else {
+            console.warn("Script Monetag tidak terdeteksi di embed maupun di parent!");
           }
         } catch (error) {
           console.error("Gagal memuat iklan Monetag:", error);
         }
 
-        // 2. Hancurkan Kaca Transparan biar VAST bisa muncul tanpa kedip
+        // 2. Hancurkan Kaca Transparan biar VAST bisa muncul
         if (overlayKaca) {
             overlayKaca.style.display = 'none';
         }
 
-        // 3. Pancing sistem Google IMA dan putar video (Ini wajib ditaruh di luar .then() biar nembus blokir browser)
+        // 3. Pancing sistem Google IMA dan putar video VAST
         if (player.ima && !player.ima.adDisplayContainerInitialized) {
           player.ima.initializeAdDisplayContainer();
         }
@@ -126,6 +131,9 @@ export default function EmbedPlayer({ params }) {
       <link href="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.css" rel="stylesheet" />
       <link href="https://cdnjs.cloudflare.com/ajax/libs/videojs-ima/2.2.0/videojs.ima.css" rel="stylesheet" />
 
+      {/* JIKA MASIH GAK JALAN: Lu bisa paste <script> src Monetag lu persis di bawah baris ini */}
+      
+
       <Script src="https://vjs.zencdn.net/8.10.0/video.min.js" strategy="afterInteractive" onLoad={() => setVjsLoaded(true)} />
       {vjsLoaded && <Script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js" strategy="afterInteractive" onLoad={() => setImaSdkLoaded(true)} />}
       {imaSdkLoaded && <Script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.min.js" strategy="afterInteractive" onLoad={() => setVjsAdsLoaded(true)} />}
@@ -143,7 +151,7 @@ export default function EmbedPlayer({ params }) {
       {videoData && (
         <div className="video-container" onContextMenu={(e) => e.preventDefault()}>
           
-          {/* Lapisan Kaca yang nangkep Klik pertama untuk panggil Iklan Monetag */}
+          {/* Ini Kaca Transparannya. Nutupin layar penuh, nangkap klik pertama buat nembak Monetag */}
           <div id="kaca-link-offer" style={{
             position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
             zIndex: 9999, cursor: 'pointer', backgroundColor: 'transparent'
