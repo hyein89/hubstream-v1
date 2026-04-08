@@ -28,6 +28,7 @@ export default function EmbedPlayer({ params }) {
       if (vErr || !vData) { setError(true); return; }
       setVideoData(vData);
 
+      // link_offer udah gak kepake, tapi dibiarin aja takut datanya dibutuhin di tempat lain
       const { data: sData } = await supabase.from('settings').select('*').eq('id', 1).single();
       setSettings(sData || { link_offer: '', vast_urls: [] });
 
@@ -72,27 +73,31 @@ export default function EmbedPlayer({ params }) {
         });
       }
 
-      // --- LOGIKA LINK OFFER (TRIK LAPISAN SEKALI PAKAI) ---
+      // --- LOGIKA MONETAG REWARDED INTERSTITIAL ---
       const overlayKaca = document.getElementById('kaca-link-offer');
       
       const handleKlikPertama = () => {
-        const linkOffer = settings.link_offer;
-        const jedaWaktu = 180000; // 3 Menit
-        let waktuSekarang = new Date().getTime();
-        let waktuTerakhir = localStorage.getItem('catatanLinkOfferVidly');
-
-        // 1. Eksekusi Link Offer (100% tembus karena direct click di HTML mentah)
-        if (linkOffer && (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu))) {
-          window.open(linkOffer, '_blank');
-          localStorage.setItem('catatanLinkOfferVidly', waktuSekarang.toString());
+        
+        // 1. Panggil Iklan Monetag (Cek dulu biar gak error kalau script belum ngeload)
+        try {
+          if (typeof window.show_10806273 === 'function') {
+            window.show_10806273().then(() => {
+              // Fungsi ini dieksekusi setelah penonton selesai lihat iklan Monetag
+              console.log('Iklan Monetag Selesai');
+              // Opsional: Pastikan video kembali terputar
+              if (player.paused()) player.play();
+            }).catch(e => console.log('Monetag skip/error:', e));
+          }
+        } catch (error) {
+          console.error("Gagal memuat iklan Monetag:", error);
         }
 
-        // 2. Hancurkan Kaca Transparan (Mencegah kedip hitam & ngasih jalan buat Iklan VAST)
+        // 2. Hancurkan Kaca Transparan biar VAST bisa muncul tanpa kedip
         if (overlayKaca) {
             overlayKaca.style.display = 'none';
         }
 
-        // 3. Pancing sistem Google IMA dan putar video
+        // 3. Pancing sistem Google IMA dan putar video (Ini wajib ditaruh di luar .then() biar nembus blokir browser)
         if (player.ima && !player.ima.adDisplayContainerInitialized) {
           player.ima.initializeAdDisplayContainer();
         }
@@ -100,7 +105,6 @@ export default function EmbedPlayer({ params }) {
       };
 
       if (overlayKaca) {
-        // Pake 'click' murni di elemen paling atas
         overlayKaca.addEventListener('click', handleKlikPertama);
       }
 
@@ -139,7 +143,7 @@ export default function EmbedPlayer({ params }) {
       {videoData && (
         <div className="video-container" onContextMenu={(e) => e.preventDefault()}>
           
-          {/* INI KUNCI RAHASIANYA: Lapisan Kaca yang nangkep Link Offer terus hancur */}
+          {/* Lapisan Kaca yang nangkep Klik pertama untuk panggil Iklan Monetag */}
           <div id="kaca-link-offer" style={{
             position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
             zIndex: 9999, cursor: 'pointer', backgroundColor: 'transparent'
