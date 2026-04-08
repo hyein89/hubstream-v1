@@ -57,6 +57,7 @@ export default function EmbedPlayer({ params }) {
             showCountdown: true
         });
 
+        // Anti Suara Balap
         player.on('contentPauseRequested', () => { player.pause(); });
         player.on('contentResumeRequested', () => { player.play(); });
 
@@ -71,38 +72,27 @@ export default function EmbedPlayer({ params }) {
         });
       }
 
-      // --- LOGIKA MONETAG (PELACAK OTOMATIS) ---
+      // --- LOGIKA LINK OFFER (TRIK LAPISAN SEKALI PAKAI) ---
       const overlayKaca = document.getElementById('kaca-link-offer');
       
       const handleKlikPertama = () => {
-        
-        // 1. Panggil Iklan Monetag dengan Pelacak Iframe
-        try {
-          // Cek apakah script ada di halaman embed ini
-          if (typeof window.show_10806273 === 'function') {
-            window.show_10806273().then(() => {
-              if (player.paused()) player.play();
-            });
-          } 
-          // Cek apakah script ada di halaman utama (kalau dipasang via Iframe)
-          else if (window.parent && typeof window.parent.show_10806273 === 'function') {
-            window.parent.show_10806273().then(() => {
-              if (player.paused()) player.play();
-            });
-          } 
-          else {
-            console.warn("Script Monetag tidak terdeteksi di embed maupun di parent!");
-          }
-        } catch (error) {
-          console.error("Gagal memuat iklan Monetag:", error);
+        const linkOffer = settings.link_offer;
+        const jedaWaktu = 180000; // 3 Menit
+        let waktuSekarang = new Date().getTime();
+        let waktuTerakhir = localStorage.getItem('catatanLinkOfferVidly');
+
+        // 1. Eksekusi Link Offer (100% tembus karena direct click di HTML mentah)
+        if (linkOffer && (!waktuTerakhir || (waktuSekarang - waktuTerakhir > jedaWaktu))) {
+          window.open(linkOffer, '_blank');
+          localStorage.setItem('catatanLinkOfferVidly', waktuSekarang.toString());
         }
 
-        // 2. Hancurkan Kaca Transparan biar VAST bisa muncul
+        // 2. Hancurkan Kaca Transparan (Mencegah kedip hitam & ngasih jalan buat Iklan VAST)
         if (overlayKaca) {
             overlayKaca.style.display = 'none';
         }
 
-        // 3. Pancing sistem Google IMA dan putar video VAST
+        // 3. Pancing sistem Google IMA dan putar video
         if (player.ima && !player.ima.adDisplayContainerInitialized) {
           player.ima.initializeAdDisplayContainer();
         }
@@ -110,6 +100,7 @@ export default function EmbedPlayer({ params }) {
       };
 
       if (overlayKaca) {
+        // Pake 'click' murni di elemen paling atas
         overlayKaca.addEventListener('click', handleKlikPertama);
       }
 
@@ -131,9 +122,6 @@ export default function EmbedPlayer({ params }) {
       <link href="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.css" rel="stylesheet" />
       <link href="https://cdnjs.cloudflare.com/ajax/libs/videojs-ima/2.2.0/videojs.ima.css" rel="stylesheet" />
 
-      {/* JIKA MASIH GAK JALAN: Lu bisa paste <script> src Monetag lu persis di bawah baris ini */}
-      
-
       <Script src="https://vjs.zencdn.net/8.10.0/video.min.js" strategy="afterInteractive" onLoad={() => setVjsLoaded(true)} />
       {vjsLoaded && <Script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js" strategy="afterInteractive" onLoad={() => setImaSdkLoaded(true)} />}
       {imaSdkLoaded && <Script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-ads/7.3.2/videojs.ads.min.js" strategy="afterInteractive" onLoad={() => setVjsAdsLoaded(true)} />}
@@ -151,7 +139,7 @@ export default function EmbedPlayer({ params }) {
       {videoData && (
         <div className="video-container" onContextMenu={(e) => e.preventDefault()}>
           
-          {/* Ini Kaca Transparannya. Nutupin layar penuh, nangkap klik pertama buat nembak Monetag */}
+          {/* INI KUNCI RAHASIANYA: Lapisan Kaca yang nangkep Link Offer terus hancur */}
           <div id="kaca-link-offer" style={{
             position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
             zIndex: 9999, cursor: 'pointer', backgroundColor: 'transparent'
