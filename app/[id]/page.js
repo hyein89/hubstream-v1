@@ -43,6 +43,32 @@ export default function HalamanTonton({ params }) {
     }
   }, [settings?.ads_native, loading]);
 
+  // ==========================================
+  // LOGIKA BARU: Iklan Auto-Popup In-App Interstitial Monetag
+  // (Sama sekali tidak mengubah kode lain)
+  // ==========================================
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const timer = setTimeout(() => {
+        if (window.show_10806273) {
+          window.show_10806273({ 
+            type: 'inApp', 
+            inAppSettings: { 
+              frequency: 2, 
+              capping: 0.1, 
+              interval: 30, 
+              timeout: 5, 
+              everyPage: false 
+            } 
+          }).catch(err => console.log("Iklan interstitial gagal dimuat:", err));
+        }
+      }, 1000); // Tunggu 1 detik untuk memastikan script utama monetag di <head> sudah beres diload
+
+      return () => clearTimeout(timer);
+    }
+  }, []);
+  // ==========================================
+
   if (error) return notFound();
   if (loading) return <div style={{ background: '#0d1117', height: '100vh' }} />;
 
